@@ -1,0 +1,41 @@
+# Configuration optimized for high recall (permissive)
+
+ensemble:
+  labels_dir: "labels"
+  output_dir: "labels/unified"
+  iou_threshold: 0.3  # Lower threshold for more matches
+  
+  strategies:
+    nms:
+      iou_threshold: 0.3
+      score_threshold: 0.05  # Very low threshold
+    
+    majority_vote:
+      min_votes: 1  # Any model detection
+      iou_threshold: 0.3
+    
+    weighted_vote:
+      use_model_weights: true
+      iou_threshold: 0.3
+    
+    dbscan:
+      eps: 0.15  # Larger clusters
+      min_samples: 1  # Single detection clusters allowed
+    
+    soft_voting:
+      temperature: 2.0  # Less decisive, more permissive
+      iou_threshold: 0.3
+
+analysis:
+  iou_threshold: 0.3
+  top_classes: 30
+  generate_plots: true
+  plot_formats: 
+    - "png"
+    - "svg"
+
+visualization:
+  figure_size: [16, 10]
+  dpi: 300
+  style: "ticks"
+  color_palette: "bright"

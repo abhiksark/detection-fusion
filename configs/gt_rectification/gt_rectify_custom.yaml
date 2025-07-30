@@ -1,0 +1,94 @@
+# DetectionFusion GT Rectification Configuration - Custom Template
+# This configuration serves as a template for custom GT rectification setups
+
+gt_rectification:
+  # Mode configuration
+  mode: "minimize_error"  # Options: "minimize_error" (conservative) or "maximize_error" (aggressive)
+  
+  # Directory paths (customize these for your dataset)
+  labels_dir: "path/to/labels"
+  gt_dir: "path/to/ground_truth"
+  images_dir: "path/to/images"
+  output_dir: "path/to/output"
+  
+  # Threshold parameters (customize based on your needs)
+  confidence_threshold: 0.5        # Minimum confidence for detections (0.1-0.9)
+  iou_threshold: 0.5               # IoU threshold for matching (0.3-0.8)
+  min_strategy_agreement: 0.7      # Fraction of strategies that must agree (0.5-0.9)
+  consensus_threshold: 0.75        # Consensus threshold for error detection (0.6-0.9)
+  
+  # Strategy selection (customize based on your models and requirements)
+  # Available strategies: weighted_vote, bayesian, consensus_ranking, majority_vote_2, 
+  # majority_vote_3, unanimous, nms, affirmative_nms, confidence_weighted_nms,
+  # dbscan, centroid_clustering, distance_weighted, soft_voting, adaptive_threshold,
+  # density_adaptive, multi_scale, high_confidence_first, confidence_threshold_voting
+  strategies:
+    - "weighted_vote"              # Recommended: Good general performance
+    - "bayesian"                   # Recommended: Probabilistic approach
+    - "consensus_ranking"          # Recommended: Combines ranking with confidence
+    - "majority_vote_2"            # Basic: Requires 2+ models to agree
+    - "affirmative_nms"            # NMS-based with multi-model agreement
+    - "confidence_weighted_nms"    # Advanced NMS with confidence weighting
+    - "adaptive_threshold"         # Adaptive: Different thresholds for object sizes
+    - "high_confidence_first"      # Prioritizes high-confidence detections
+  
+  # Error detection parameters (fine-tune based on your tolerance)
+  error_detection:
+    min_confidence_gap: 0.2        # Minimum confidence difference to flag error (0.1-0.5)
+    min_disagreement_ratio: 0.6    # Minimum disagreement ratio to flag error (0.5-0.8)
+    require_multiple_strategies: true   # Require multiple strategies to agree on error
+    detect_edge_cases: false       # Include borderline/uncertain cases
+    
+  # Output configuration (customize based on review capacity)
+  output:
+    include_most_correct: 50       # Number of most correct images for reference
+    include_most_incorrect: 50     # Number of most incorrect images to review
+    create_analysis_files: true    # Create detailed analysis files per image
+    create_summary_report: true    # Create overall summary report
+    copy_images: true              # Copy images to output directory
+    
+  # Analysis parameters (customize based on analysis needs)
+  analysis:
+    confidence_bins: 8             # Number of confidence bins for analysis (5-15)
+    spatial_analysis: true         # Enable spatial error distribution analysis
+    size_analysis: true           # Enable object size-based error analysis
+    class_analysis: false         # Enable per-class error analysis (expensive)
+    error_categories:              # Types of errors to detect
+      - "missing_in_gt"            # Objects detected by models but missing in GT
+      - "extra_in_gt"              # Objects in GT but not detected by models
+      - "classification_error"     # Wrong class labels in GT
+      - "localization_error"       # Poor bounding box alignment in GT
+
+# Evaluation settings for validation
+evaluation:
+  confidence_threshold: 0.1        # Very permissive for evaluation
+  iou_thresholds:                  # IoU thresholds for evaluation
+    - 0.5
+    - 0.75
+  metrics:                         # Metrics to calculate
+    - "precision"
+    - "recall"
+    - "f1_score"
+    - "map_50"
+
+# Visualization settings
+visualization:
+  generate_plots: true             # Generate visualization plots
+  figure_size: [12, 8]            # Figure size for plots
+  dpi: 200                        # DPI for plot quality
+  style: "seaborn"                # Plot style
+  color_palette: "Set2"           # Color palette for plots
+  plot_types:                     # Types of plots to generate
+    - "confidence_distribution"    # Confidence score distributions
+    - "error_category_breakdown"   # Breakdown of error types
+    - "strategy_agreement_matrix"  # Agreement between strategies
+
+# Usage Instructions:
+# 1. Copy this file and rename it (e.g., my_dataset_config.yaml)
+# 2. Update the directory paths to match your dataset structure
+# 3. Adjust thresholds based on your quality requirements:
+#    - Lower thresholds = more potential errors detected (less precise)
+#    - Higher thresholds = fewer, higher-confidence errors (more precise)
+# 4. Select strategies based on your ensemble models and performance needs
+# 5. Customize output parameters based on your review capacity
+# 6. Run: python gt_rectify.py --config path/to/your/config.yaml

@@ -1,0 +1,96 @@
+# DetectionFusion GT Rectification Configuration - Aggressive Mode
+# This configuration uses aggressive parameters for comprehensive error detection
+
+gt_rectification:
+  # Mode configuration
+  mode: "maximize_error"  # Aggressive approach - comprehensive error detection
+  
+  # Directory paths
+  labels_dir: "labels"
+  gt_dir: "labels/GT"
+  images_dir: "images"
+  output_dir: "rectified_dataset_aggressive"
+  
+  # Threshold parameters (aggressive - permissive thresholds)
+  confidence_threshold: 0.3        # Lower confidence threshold
+  iou_threshold: 0.4               # More permissive IoU
+  min_strategy_agreement: 0.6      # 60% of strategies agreement sufficient
+  consensus_threshold: 0.65        # Lower consensus threshold
+  
+  # Strategy selection (comprehensive - all strategies)
+  strategies:
+    - "weighted_vote"
+    - "bayesian"
+    - "consensus_ranking"
+    - "majority_vote_2"
+    - "majority_vote_3"
+    - "unanimous"
+    - "nms"
+    - "affirmative_nms"
+    - "confidence_weighted_nms"
+    - "dbscan"
+    - "centroid_clustering"
+    - "distance_weighted"
+    - "soft_voting"
+    - "adaptive_threshold"
+    - "density_adaptive"
+    - "multi_scale"
+    - "high_confidence_first"
+    - "confidence_threshold_voting"
+  
+  # Error detection parameters
+  error_detection:
+    min_confidence_gap: 0.1        # Small gap sufficient
+    min_disagreement_ratio: 0.5    # Moderate disagreement sufficient
+    require_multiple_strategies: false  # Single strategy disagreement sufficient
+    detect_edge_cases: true        # Include borderline cases
+    
+  # Output configuration
+  output:
+    include_most_correct: 50       # More reference images
+    include_most_incorrect: 100    # More flagged images for review
+    create_analysis_files: true
+    create_summary_report: true
+    create_detailed_report: true   # Additional detailed analysis
+    copy_images: true
+    
+  # Analysis parameters
+  analysis:
+    confidence_bins: 10            # More detailed confidence analysis
+    spatial_analysis: true         # Enable spatial error analysis
+    size_analysis: true           # Enable size-based analysis
+    class_analysis: true          # Per-class error analysis
+    error_categories:
+      - "missing_in_gt"
+      - "extra_in_gt"
+      - "classification_error"
+      - "localization_error"
+      - "duplicate_detection"
+      - "low_confidence_fp"
+
+# Evaluation settings for validation
+evaluation:
+  confidence_threshold: 0.05      # Very permissive for detection
+  iou_thresholds:
+    - 0.3
+    - 0.5
+    - 0.7
+  metrics:
+    - "precision"
+    - "recall"
+    - "f1_score"
+    - "map_50"
+    - "map_50_95"
+
+# Visualization settings
+visualization:
+  generate_plots: true            # Generate comprehensive plots
+  figure_size: [14, 8]
+  dpi: 300
+  style: "seaborn"
+  color_palette: "Set1"
+  plot_types:
+    - "confidence_distribution"
+    - "error_category_breakdown"
+    - "spatial_error_heatmap"
+    - "strategy_agreement_matrix"

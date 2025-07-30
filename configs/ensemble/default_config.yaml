@@ -1,0 +1,40 @@
+# DetectionFusion Default Configuration
+
+ensemble:
+  labels_dir: "labels"
+  output_dir: "labels/unified"
+  iou_threshold: 0.5
+  
+  strategies:
+    majority_vote:
+      min_votes: 2
+    
+    weighted_vote:
+      use_model_weights: true
+    
+    nms:
+      score_threshold: 0.1
+    
+    dbscan:
+      eps: 0.1
+      min_samples: 2
+    
+    soft_voting:
+      temperature: 1.0
+    
+    affirmative_nms:
+      min_models: 2
+
+analysis:
+  iou_threshold: 0.5
+  top_classes: 20
+  generate_plots: true
+  plot_formats: 
+    - "png"
+    - "pdf"
+
+visualization:
+  figure_size: [14, 8]
+  dpi: 300
+  style: "seaborn"
+  color_palette: "Set2"
