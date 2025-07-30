@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="detection-fusion",
-    version="0.2.0",
+    version="0.2.1",
     author="Abhik Sarkar",
     description="DetectionFusion: Python toolkit for fusing multiple object detection results with ground truth validation and error analysis",
     long_description=long_description,

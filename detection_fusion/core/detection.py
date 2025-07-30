@@ -13,6 +13,7 @@ class Detection:
     h: float  # height
     confidence: float
     model_source: str = ""
+    image_name: str = ""  # Image this detection belongs to
     
     @property
     def bbox(self) -> List[float]:
@@ -60,4 +61,32 @@ class Detection:
             h=bbox[3],
             confidence=data['confidence'],
             model_source=data.get('model_source', '')
+        )
+    
+    def __hash__(self) -> int:
+        """Make Detection hashable for use in sets/dicts."""
+        return hash((
+            self.class_id,
+            round(self.x, 6),
+            round(self.y, 6),
+            round(self.w, 6),
+            round(self.h, 6),
+            round(self.confidence, 6),
+            self.model_source,
+            self.image_name
+        ))
+    
+    def __eq__(self, other) -> bool:
+        """Check equality between detections."""
+        if not isinstance(other, Detection):
+            return False
+        return (
+            self.class_id == other.class_id and
+            abs(self.x - other.x) < 1e-6 and
+            abs(self.y - other.y) < 1e-6 and
+            abs(self.w - other.w) < 1e-6 and
+            abs(self.h - other.h) < 1e-6 and
+            abs(self.confidence - other.confidence) < 1e-6 and
+            self.model_source == other.model_source and
+            self.image_name == other.image_name
         )

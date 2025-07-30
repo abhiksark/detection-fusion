@@ -11,7 +11,7 @@ ensemble:
       score_threshold: 0.05  # Very low threshold
     
     majority_vote:
-      min_votes: 1  # Any model detection
+      min_votes: 2  # Any two model detection
       iou_threshold: 0.3
     
     weighted_vote:

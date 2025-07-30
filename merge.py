@@ -17,9 +17,10 @@ import argparse
 import sys
 from pathlib import Path
 from typing import List, Dict, Optional
+from tqdm import tqdm
 
 from detection_fusion import AdvancedEnsemble
-from detection_fusion.utils import load_yaml_config, save_detections, validate_ground_truth_structure
+from detection_fusion.utils import load_yaml_config, save_detections, validate_ground_truth_structure, read_detections
 from detection_fusion.core.detection import Detection
 
 
@@ -133,6 +134,17 @@ Examples:
         action="store_true",
         help="Quiet mode (minimal output)"
     )
+    parser.add_argument(
+        "--image-mode",
+        action="store_true",
+        default=True,
+        help="Compare detections image by image (default behavior)"
+    )
+    parser.add_argument(
+        "--single-file-mode",
+        action="store_true",
+        help="Use single detection file per model (legacy behavior)"
+    )
     
     return parser.parse_args()
 
@@ -220,29 +232,35 @@ def setup_ensemble(args) -> AdvancedEnsemble:
 
 def load_model_detections(ensemble: AdvancedEnsemble, args) -> Dict[str, List[Detection]]:
     """Load detections from specified models."""
+    # Load all detections first - use image mode by default
+    if hasattr(args, 'single_file_mode') and args.single_file_mode:
+        all_detections = ensemble.load_detections()
+    else:
+        # Default to image mode
+        all_detections = ensemble.load_all_image_detections()
+    
     if args.models:
-        # Load specific models
+        # Filter to specific models
         detections = {}
         for model_name in args.models:
-            try:
-                model_detections = ensemble.load_model_detections(model_name)
+            if model_name in all_detections:
+                model_detections = all_detections[model_name]
                 detections[model_name] = model_detections
                 if not args.quiet:
                     print(f"✓ Loaded {len(model_detections)} detections from {model_name}")
-            except FileNotFoundError:
+            else:
                 print(f"⚠️  Model '{model_name}' not found in labels directory")
                 continue
         
         return detections
     
     else:
-        # Load all models from directory
-        ensemble.load_detections("detections.txt")  # Default detection file
+        # Use all loaded models
         if not args.quiet:
-            total_detections = sum(len(dets) for dets in ensemble.detections.values())
-            print(f"✓ Loaded {total_detections} total detections from {len(ensemble.detections)} models")
+            total_detections = sum(len(dets) for dets in all_detections.values())
+            print(f"✓ Loaded {total_detections} total detections from {len(all_detections)} models")
         
-        return ensemble.detections
+        return all_detections
 
 
 def run_single_strategy(ensemble: AdvancedEnsemble, strategy_name: str, args) -> List[Detection]:
@@ -257,22 +275,67 @@ def run_single_strategy(ensemble: AdvancedEnsemble, strategy_name: str, args) ->
         print(f"🔄 Running strategy: {strategy_name}")
     
     try:
-        results = ensemble.run_strategy(strategy_name)
-        
-        if not args.quiet:
-            avg_conf = sum(d.confidence for d in results) / len(results) if results else 0
-            print(f"✓ {strategy_name}: {len(results)} detections (avg conf: {avg_conf:.3f})")
-        
-        return results
+        # Check if we should run per-image (when outputting to unified directory)
+        output_path = Path(args.output)
+        if output_path.name == "unified" or (not args.single_file_mode and output_path.suffix == ""):
+            # Run per-image strategy for unified output
+            return run_strategy_per_image(ensemble, strategy_name, args)
+        else:
+            # Run traditional single-file strategy
+            results = ensemble.run_strategy(strategy_name)
+            
+            if not args.quiet:
+                avg_conf = sum(d.confidence for d in results) / len(results) if results else 0
+                print(f"✓ {strategy_name}: {len(results)} detections (avg conf: {avg_conf:.3f})")
+            
+            return results
     
     except Exception as e:
         print(f"❌ Error running {strategy_name}: {e}")
         return []
 
 
+def run_strategy_per_image(ensemble: AdvancedEnsemble, strategy_name: str, args) -> List[Detection]:
+    """Run ensemble strategy on each image separately."""
+    # Get the pre-loaded image detections structure
+    from collections import defaultdict
+    image_detections = defaultdict(dict)
+    
+    # We need to reconstruct the image detections from the loaded detections
+    # This is a bit hacky but necessary given the current structure
+    for model_dir in ensemble.labels_dir.iterdir():
+        if model_dir.is_dir() and model_dir.name not in ["unified", "__pycache__", "GT"]:
+            model_name = model_dir.name
+            
+            txt_files = list(model_dir.glob("*.txt"))
+            for txt_file in tqdm(txt_files, desc=f"  Loading {model_name}", leave=False):
+                image_name = txt_file.stem
+                detections = read_detections(str(txt_file), model_name, 1.0, image_name)
+                
+                # Filter to only the models we're using
+                if hasattr(args, 'models') and args.models and model_name not in args.models:
+                    continue
+                    
+                image_detections[image_name][model_name] = detections
+    
+    # Run strategy per image
+    image_results = ensemble.run_strategy_per_image(strategy_name, dict(image_detections))
+    
+    # Flatten results for compatibility but preserve image_name
+    all_results = []
+    for image_name, detections in image_results.items():
+        all_results.extend(detections)
+    
+    if not args.quiet:
+        avg_conf = sum(d.confidence for d in all_results) / len(all_results) if all_results else 0
+        print(f"✓ {strategy_name}: {len(all_results)} detections across {len(image_results)} images (avg conf: {avg_conf:.3f})")
+    
+    return all_results
+
+
 def find_best_strategy_with_gt(ensemble: AdvancedEnsemble, args) -> Optional[str]:
     """Find the best strategy using ground truth evaluation."""
-    if not args.gt and not args.auto_strategy:
+    if not hasattr(args, 'gt') or not args.gt and not (hasattr(args, 'auto_strategy') and args.auto_strategy):
         return None
     
     # Validate GT structure
@@ -324,7 +387,7 @@ def run_gt_strategy_comparison(ensemble: AdvancedEnsemble, strategies: List[str]
     
     strategy_evaluations = {}
     
-    for strategy_name in strategies:
+    for strategy_name in tqdm(strategies, desc="Comparing strategies", disable=not args.verbose):
         if strategy_name not in ensemble.strategies:
             continue
         
@@ -374,20 +437,66 @@ def print_gt_strategy_comparison(evaluations: Dict[str, Dict], metric: str):
 def save_results(results: List[Detection], output_path: str, format_type: str, args):
     """Save ensemble results to file."""
     try:
-        if format_type == "json":
-            import json
-            results_dict = [det.to_dict() for det in results]
-            with open(output_path, 'w') as f:
-                json.dump(results_dict, f, indent=2)
-        else:
-            # YOLO format (default)
-            save_detections(results, output_path)
+        # If output path is a directory or ends with /, save per-image
+        output_path_obj = Path(output_path)
         
-        if not args.quiet:
-            print(f"💾 Results saved to: {output_path}")
+        # Check if we should save in unified directory format
+        if output_path_obj.name == "unified" or (not args.single_file_mode and output_path_obj.suffix == ""):
+            # Save per-image in unified directory format
+            save_unified_results(results, output_path_obj, format_type, args)
+        else:
+            # Save to single file
+            if format_type == "json":
+                import json
+                results_dict = [det.to_dict() for det in results]
+                with open(output_path, 'w') as f:
+                    json.dump(results_dict, f, indent=2)
+            else:
+                # YOLO format (default)
+                save_detections(results, output_path)
+            
+            if not args.quiet:
+                print(f"💾 Results saved to: {output_path}")
     
     except Exception as e:
         print(f"❌ Error saving results: {e}")
+
+
+def save_unified_results(results: List[Detection], output_dir: Path, format_type: str, args):
+    """Save results in unified directory format (per-image files)."""
+    # Create output directory
+    output_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Group detections by image
+    image_detections = {}
+    for det in results:
+        # Extract image name from detection (assuming it's stored during loading)
+        # For now, we'll use a placeholder - this needs to be enhanced
+        image_name = "detections"  # Default name if no image info
+        if hasattr(det, 'image_name'):
+            image_name = det.image_name
+        
+        if image_name not in image_detections:
+            image_detections[image_name] = []
+        image_detections[image_name].append(det)
+    
+    # Save each image's detections
+    total_files = 0
+    for image_name, detections in image_detections.items():
+        if format_type == "json":
+            output_file = output_dir / f"{image_name}.json"
+            import json
+            results_dict = [det.to_dict() for det in detections]
+            with open(output_file, 'w') as f:
+                json.dump(results_dict, f, indent=2)
+        else:
+            # YOLO format
+            output_file = output_dir / f"{image_name}.txt"
+            save_detections(detections, str(output_file))
+        total_files += 1
+    
+    if not args.quiet:
+        print(f"💾 Results saved to {total_files} files in: {output_dir}/")
 
 
 def main():
@@ -419,7 +528,7 @@ def main():
     # Handle ground truth guided strategy selection
     selected_strategy = None
     
-    if args.auto_strategy or (args.gt and args.optimize_strategy):
+    if hasattr(args, 'auto_strategy') and args.auto_strategy or (hasattr(args, 'gt') and hasattr(args, 'optimize_strategy') and args.gt and args.optimize_strategy):
         selected_strategy = find_best_strategy_with_gt(ensemble, args)
         if selected_strategy:
             if not args.quiet:
@@ -435,7 +544,7 @@ def main():
             print(f"🎯 Running {len(args.strategies)} strategies...")
         
         all_results = {}
-        for strategy_name in args.strategies:
+        for strategy_name in tqdm(args.strategies, desc="Running strategies", disable=args.quiet):
             results = run_single_strategy(ensemble, strategy_name, args)
             if results:
                 all_results[strategy_name] = results
@@ -492,7 +601,7 @@ def main():
             save_results(results, args.output, args.format, args)
             
             # If GT evaluation was used, show performance metrics
-            if args.gt and selected_strategy:
+            if hasattr(args, 'gt') and args.gt and selected_strategy:
                 try:
                     evaluation = ensemble.evaluate_strategy_with_gt(final_strategy, args.gt_file)
                     if evaluation and not args.quiet:

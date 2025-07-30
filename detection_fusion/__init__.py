@@ -5,7 +5,7 @@ A comprehensive toolkit for fusing multiple object detection results with
 ground truth validation and error analysis.
 """
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 __author__ = "DetectionFusion Team"
 
 from .core.detection import Detection

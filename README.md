@@ -2,7 +2,7 @@
 
 [![Python 3.7+](https://img.shields.io/badge/python-3.7+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/version-0.2.0-green.svg)](https://github.com/abhiksark/detection-fusion)
+[![Version](https://img.shields.io/badge/version-0.2.1-green.svg)](https://github.com/abhiksark/detection-fusion)
 
 **DetectionFusion: Python toolkit for fusing multiple object detection results with ground truth validation and error analysis.**
 
@@ -10,15 +10,16 @@ Perfect for scenarios where you have multiple object detection models - leverage
 
 ## 🌟 Key Features
 
-- **🤖 Advanced Ensemble Learning**: 17+ strategies from simple voting to adaptive methods
+- **🤖 Advanced Ensemble Learning**: 19 strategies from simple voting to adaptive methods
 - **📊 Ground Truth Evaluation**: Complete evaluation framework with standard object detection metrics
 - **🔬 Error Analysis**: Detailed error classification and analysis (FP, FN, localization, classification)
 - **🎯 Strategy Optimization**: Automatic best strategy selection using ground truth feedback
-- **🔍 GT Rectification**: Identify potential ground truth annotation errors using ensemble consensus (two modes: conservative & aggressive)
+- **🔍 GT Rectification**: Identify potential ground truth annotation errors using ensemble consensus with F1-based quality scoring (two modes: conservative & aggressive)
 - **📈 Comprehensive Analysis**: Deep insights into model performance and agreement
 - **🎨 Rich Visualizations**: Automated plots, reports, and precision-recall curves
-- **⚡ Professional CLI Tools**: Intuitive merge.py, val.py, and gt_rectify.py interfaces with GT support
+- **⚡ Professional CLI Tools**: Intuitive merge.py, val.py, and gt_rectify.py interfaces with GT support and progress tracking
 - **🔧 YAML Configuration**: External, flexible configuration management
+- **📈 Progress Tracking**: Real-time progress bars for all long-running operations using tqdm
 - **📦 Production Ready**: Professional packaging with full documentation and testing
 
 ## 📁 Project Structure
@@ -61,9 +62,13 @@ configs/                     # Organized configuration files
     ├── gt_rectify_balanced.yaml    # Balanced approach
     └── gt_rectify_custom.yaml      # Template for customization
 examples/                    # Usage examples and demonstrations
-├── merge.py                 # CLI ensemble merging tool with GT optimization
-├── val.py                   # CLI assessment tool with GT evaluation
-└── gt_rectify.py            # GT rectification system with CLI and implementation
+├── basic_usage.py           # Basic ensemble usage examples
+├── advanced_usage.py        # Advanced strategies and GT evaluation
+├── config_usage.py          # Configuration-based examples
+└── rectification_example.py # GT rectification examples
+merge.py                     # CLI ensemble merging tool with GT optimization
+val.py                       # CLI assessment tool with GT evaluation
+gt_rectify.py                # GT rectification system with CLI and implementation
 ```
 
 ## 🚀 Quick Start
@@ -107,7 +112,9 @@ labels/
 python merge.py --models model1 model2 model3 --strategy weighted_vote --output results.txt
 
 # 3. Ground truth guided strategy selection (NEW!)
-python merge.py --models-dir labels/ --gt --auto-strategy --output best_ensemble.txt
+# Note: GT evaluation is done via val.py, then use merge.py for the actual ensemble
+python val.py --models-dir labels/ --gt --optimize-strategy --output best_strategy_report.txt
+python merge.py --models-dir labels/ --strategy weighted_vote --output best_ensemble.txt
 
 # 4. Comprehensive assessment with ground truth evaluation
 python val.py --models-dir labels/ --gt --analyze evaluation --error-analysis
@@ -131,7 +138,7 @@ from detection_fusion import AdvancedEnsemble, MultiModelAnalyzer, Evaluator
 from detection_fusion.utils import load_yaml_config
 
 # Load configuration
-config = load_yaml_config("configs/default_config.yaml")
+config = load_yaml_config("configs/ensemble/default_config.yaml")
 
 # Basic ensemble with 17+ strategies
 ensemble = AdvancedEnsemble("labels")
@@ -172,13 +179,15 @@ labels/
 ├── model1/detections.txt
 ├── model2/detections.txt
 ├── model3/detections.txt
-└── GT/detections.txt          # Ground truth annotations
+└── GT/                         # Ground truth annotations
+    ├── detections.txt          # Single file format
+    └── *.txt                   # Or per-image format
 ```
 
 #### CLI Ground Truth Evaluation
 ```bash
-# Find optimal strategy using ground truth
-python merge.py --models-dir labels/ --gt --optimize-strategy --evaluation-metric map_50
+# Find optimal strategy using ground truth (use val.py for GT operations)
+python val.py --models-dir labels/ --gt --optimize-strategy --metrics map_50
 
 # Comprehensive evaluation with error analysis
 python val.py --models-dir labels/ --gt --analyze evaluation --error-analysis
@@ -187,7 +196,7 @@ python val.py --models-dir labels/ --gt --analyze evaluation --error-analysis
 python val.py --models-dir labels/ --gt --benchmark-strategies --optimize-strategy
 
 # Compare strategies with detailed GT metrics
-python merge.py --models-dir labels/ --strategies weighted_vote bayesian nms --gt
+python val.py --models-dir labels/ --gt --compare strategies --strategies weighted_vote bayesian nms
 ```
 
 #### Python API Ground Truth Features
@@ -215,36 +224,39 @@ optimizer = StrategyOptimizer(evaluator)
 best_result = optimizer.optimize_all_strategies(ensemble)
 print(f"Best strategy: {best_result.best_strategy}")
 
-# GT Rectification - Identify annotation errors (NEW!)
-from gt_rectify import GTRectifier
+# GT Rectification - Identify annotation errors with F1-based quality scoring (NEW!)
+from detection_fusion import GTRectifier
 
 # Conservative mode (default): Only high-confidence errors
 conservative_rectifier = GTRectifier(
     labels_dir="labels/",
     gt_dir="labels/GT/", 
     images_dir="images/",
+    output_dir="labels/unified/",
     mode="minimize_error"  # Conservative approach
 )
 
 results = conservative_rectifier.run_full_analysis("detections.txt")
 print(f"High-confidence errors found: {results['total_errors_found']}")
+print(f"Average F1 score: {results['average_f1_score']:.3f}")
 
 # Aggressive mode: More comprehensive error detection
 aggressive_rectifier = GTRectifier(
     labels_dir="labels/",
     gt_dir="labels/GT/", 
     images_dir="images/",
+    output_dir="labels/unified/",
     mode="maximize_error"  # Aggressive approach
 )
 
 results = aggressive_rectifier.run_full_analysis("detections.txt")
 print(f"All potential errors found: {results['total_errors_found']}")
 
-# Create organized dataset for human review
+# Create organized dataset for human review with F1-based ranking
 aggressive_rectifier.create_rectified_dataset(
     output_dir="rectified_dataset/",
-    include_most_correct=50,
-    include_most_incorrect=50
+    include_most_correct=50,    # Highest F1 scores
+    include_most_incorrect=50   # Lowest F1 scores
 )
 ```
 
@@ -276,9 +288,9 @@ class_id x_center y_center width height confidence
 
 Where coordinates are normalized (0-1) and in YOLO format.
 
-## 🎯 Ensemble Strategies (17+ Available!)
+## 🎯 Ensemble Strategies (19 Available!)
 
-### Basic Voting (4 strategies)
+### Basic Voting (5 strategies)
 - **Majority Voting**: Requires minimum number of models to agree (2, 3, or all)
 - **Weighted Voting**: Weights detections by confidence scores and model performance
 - **Unanimous**: Only keeps detections ALL models agree on (highest precision)
@@ -297,7 +309,7 @@ Where coordinates are normalized (0-1) and in YOLO format.
 - **Soft Voting**: Probabilistic voting with temperature scaling
 - **Bayesian Fusion**: Bayesian inference with learned class priors
 
-### Confidence-Based (3 strategies)
+### Confidence-Based (2 strategies)
 - **Confidence Threshold Voting**: Adaptive confidence thresholds per model
 - **High Confidence First**: Prioritizes high-confidence detections hierarchically
 
@@ -330,24 +342,26 @@ python merge.py --list-strategies
 
 #### Ground Truth Guided Merging (NEW!)
 ```bash
-# Auto-select best strategy using ground truth
-python merge.py --models-dir labels/ --gt --auto-strategy --output best_results.txt
+# Find optimal strategy using ground truth (use val.py for GT evaluation)
+python val.py --models-dir labels/ --gt --optimize-strategy --output best_strategy_report.txt
 
 # Optimize for specific metric
-python merge.py --models-dir labels/ --gt --optimize-strategy --evaluation-metric f1_score
+python val.py --models-dir labels/ --gt --benchmark-strategies --metrics f1
 
 # Compare strategies with GT evaluation
-python merge.py --models-dir labels/ --strategies weighted_vote bayesian nms --gt
+python val.py --models-dir labels/ --gt --compare strategies --strategies weighted_vote bayesian nms
 
 # Use custom ground truth location
-python merge.py --models-dir labels/ --gt-dir custom_gt/ --auto-strategy
+python val.py --models-dir labels/ --gt-dir custom_gt/ --gt --optimize-strategy
 ```
 
 ### val.py - Model Assessment Tool
 
+**Default Mode**: Image-by-image comparison (each .txt file represents detections for one image)
+
 #### Basic Analysis
 ```bash
-# Basic model assessment
+# Basic model assessment (image-by-image comparison by default)
 python val.py --models model1 model2 model3 --analyze agreement
 
 # Comprehensive analysis with plots
@@ -358,6 +372,12 @@ python val.py --models model1 model2 model3 --analyze class-wise --classes perso
 
 # Confidence distribution analysis
 python val.py --models-dir labels/ --analyze confidence --confidence-bins 10
+
+# Use single file mode (legacy behavior)
+python val.py --models model1 model2 --single-file-mode --analyze agreement
+
+# Handle detections with missing confidence values
+python val.py --models model1 model2 --default-confidence 0.8
 ```
 
 #### Ground Truth Evaluation (NEW!)
@@ -437,13 +457,13 @@ generate_all_plots(analyzer, output_dir="analysis_plots", include_gt=True)
 
 ## 📋 Configuration
 
-### Enhanced Configuration with Ground Truth (`configs/default_config.yaml`)
+### Configuration (`configs/ensemble/default_config.yaml`)
 ```yaml
 ensemble:
   labels_dir: "labels"
   output_dir: "labels/unified"
   iou_threshold: 0.5
-  gt_dir: "labels/GT"  # NEW: Ground truth directory
+  # gt_dir: "labels/GT"  # Ground truth directory (can be added when needed)
   
   strategies:
     majority_vote:
@@ -459,32 +479,8 @@ ensemble:
     soft_voting:
       temperature: 1.0
 
-# NEW: Evaluation configuration
-evaluation:
-  confidence_threshold: 0.1
-  iou_thresholds:
-    - 0.5
-    - 0.75
-  metrics:
-    - "precision"
-    - "recall"
-    - "f1_score"
-    - "map_50"
-    - "map_50_95"
-  
-  error_analysis:
-    enabled: true
-    confidence_bins: 10
-    spatial_analysis: true
-    size_analysis: true
-
-analysis:
-  top_classes: 20
-  generate_plots: true
-  include_gt_analysis: true  # NEW: Include GT plots
-  plot_formats: 
-    - "png"
-    - "pdf"
+# Note: The actual default_config.yaml contains only basic ensemble settings
+# For GT evaluation workflows, additional sections can be added as needed
 
 visualization:
   figure_size: [14, 8]
@@ -534,41 +530,43 @@ majority_vote_2           0.671      0.856      0.612      0.714
     Duplicate Detections: 8
 ```
 
-### GT Rectification Output (NEW!)
+### GT Rectification Output with F1-Based Scoring (NEW!)
 ```
 🔍 DetectionFusion GT Rectification System
 📁 Labels directory: labels/
 📁 Ground truth directory: gt/
 📁 Images directory: images/
 📁 Output directory: rectified_dataset/
+📊 Scoring Method: F1-based (precision & recall)
 
 🤖 Running comprehensive GT rectification analysis...
-✅ Found 17 ensemble strategies available
+✅ Found 17 ensemble strategies available  
 📊 Analyzing 150 images...
 
 📈 Analysis Results:
   Total images analyzed: 150
   Total potential errors found: 23
+  Average F1 score: 0.734
   Error types: {'missing_in_gt': 14, 'extra_in_gt': 9}
 
-⚠️  Most problematic images (lowest correctness scores):
-    image_042: 0.234 correctness
-    image_089: 0.445 correctness
-    image_156: 0.567 correctness
+⚠️  Most problematic images (lowest F1 scores):
+    image_042: 0.234 (Precision: 0.45, Recall: 0.16)
+    image_089: 0.445 (Precision: 0.38, Recall: 0.55)  
+    image_156: 0.567 (Precision: 0.72, Recall: 0.46)
 
-✅ Most reliable images (highest correctness scores):
-    image_003: 0.987 correctness
-    image_021: 0.934 correctness
-    image_067: 0.923 correctness
+✅ Most reliable images (highest F1 scores):
+    image_003: 0.987 (Precision: 0.98, Recall: 0.99)
+    image_021: 0.934 (Precision: 0.91, Recall: 0.96)
+    image_067: 0.923 (Precision: 0.89, Recall: 0.96)
 
 📁 Creating rectified dataset...
-  📋 50 most correct images copied for reference
-  ⚠️  50 most incorrect images flagged for review
-  📊 Individual analysis files created for each image
+  📋 50 most correct images copied for reference (highest F1 scores)
+  ⚠️  50 most incorrect images flagged for review (lowest F1 scores)
+  📊 Individual analysis files with detailed F1 metrics per image
 
 💡 Next steps:
    1. Review images in rectified_dataset/most_incorrect/
-   2. Check analysis files for specific recommendations
+   2. Check analysis files for precision/recall breakdown
    3. Use high-quality images from rectified_dataset/most_correct/ as reference
    4. Read detailed report: rectified_dataset/rectification_report.txt
 
@@ -793,6 +791,15 @@ pre-commit install
 pytest
 ```
 
+## 📄 What's New in v0.2.1
+
+### Documentation and Quality Improvements
+- **Complete Documentation Review**: Comprehensive review and accuracy verification of all documentation files
+- **Strategy Count Accuracy**: Updated documentation to reflect actual 19 strategies (was showing 17+)
+- **Example Corrections**: Fixed all code examples, import statements, and CLI command examples
+- **Consistency Improvements**: Ensured terminology and examples are consistent across all files
+- **F1-Based Scoring Documentation**: Enhanced GT rectification documentation with detailed F1-based quality assessment information
+
 ## 📄 What's New in v0.2.0
 
 ### Major Ground Truth Evaluation Framework
@@ -821,7 +828,7 @@ If you use this package in your research, please cite:
   title={DetectionFusion: Object Detection Ensemble Toolkit with Ground Truth Evaluation},
   author={DetectionFusion Team},
   year={2024},
-  version={0.2.0},
+  version={0.2.1},
   url={https://github.com/abhiksark/detection-fusion}
 }
 ```

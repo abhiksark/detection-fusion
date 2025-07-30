@@ -1,6 +1,6 @@
 # Ensemble Strategy Guide
 
-Comprehensive guide to choosing and configuring ensemble strategies for your object detection models. Now featuring **17+ advanced strategies** for every use case.
+Comprehensive guide to choosing and configuring ensemble strategies for your object detection models. Now featuring **19 advanced strategies** for every use case.
 
 ## 🎯 Strategy Selection Guide
 

@@ -19,3 +19,6 @@ pycocotools>=2.0.2
 
 # Configuration management
 PyYAML>=5.4.0
+
+# Progress bars
+tqdm>=4.60.0

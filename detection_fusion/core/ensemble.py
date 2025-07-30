@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 import json
+from tqdm import tqdm
 
 from .detection import Detection
 from ..utils.io import read_detections, save_detections, load_ground_truth, validate_ground_truth_structure
@@ -60,6 +61,49 @@ class EnsembleVoting:
         
         return self.detections
     
+    def load_all_image_detections(self, default_confidence: float = 1.0) -> Dict[str, List[Detection]]:
+        """Load detections for all images from all model directories (image mode)."""
+        from collections import defaultdict
+        
+        self.detections = {}
+        self.models = []
+        image_detections = defaultdict(dict)
+        
+        # Find all model directories
+        model_dirs = [d for d in self.labels_dir.iterdir() 
+                     if d.is_dir() and d.name not in ["unified", "__pycache__", "GT"]]
+        
+        print(f"Loading detections from {len(model_dirs)} models...")
+        for model_dir in tqdm(model_dirs, desc="Loading models"):
+            model_name = model_dir.name
+            self.models.append(model_name)
+            
+            # Count txt files first
+            txt_files = list(model_dir.glob("*.txt"))
+            
+            # Load all .txt files in the model directory
+            for txt_file in tqdm(txt_files, desc=f"  {model_name}", leave=False):
+                image_name = txt_file.stem
+                detections = read_detections(str(txt_file), model_name, default_confidence, image_name)
+                image_detections[image_name][model_name] = detections
+        
+        # Flatten detections for compatibility with existing ensemble code
+        for image_name, model_data in image_detections.items():
+            for model_name, image_dets in model_data.items():
+                if model_name not in self.detections:
+                    self.detections[model_name] = []
+                self.detections[model_name].extend(image_dets)
+        
+        # Print summary
+        for model_name, dets in self.detections.items():
+            print(f"Loaded {len(dets)} detections from {model_name}")
+        
+        # Adjust unanimous strategy
+        if 'unanimous' in self.strategies and isinstance(self.strategies['unanimous'], MajorityVoting):
+            self.strategies['unanimous'].min_votes = len(self.models)
+        
+        return self.detections
+    
     def add_strategy(self, name: str, strategy):
         """Add a custom strategy."""
         self.strategies[name] = strategy
@@ -87,6 +131,52 @@ class EnsembleVoting:
                 output_filename = f"{filename.split('.')[0]}_{strategy_name}.txt"
                 save_detections(merged, str(self.output_dir / output_filename))
                 print(f"  {strategy_name}: {len(merged)} detections saved")
+        
+        return results
+    
+    def run_strategy_per_image(self, strategy_name: str, image_detections: Dict[str, Dict[str, List[Detection]]] = None, **kwargs) -> Dict[str, List[Detection]]:
+        """Run a specific ensemble strategy on each image separately.
+        
+        Args:
+            strategy_name: Name of the strategy to run
+            image_detections: Optional pre-loaded image detections. If None, will load from disk.
+            **kwargs: Additional arguments for the strategy
+            
+        Returns:
+            Dict mapping image names to merged detections for that image
+        """
+        if strategy_name not in self.strategies:
+            raise ValueError(f"Unknown strategy: {strategy_name}")
+        
+        # Load image detections if not provided
+        if image_detections is None:
+            from collections import defaultdict
+            image_detections = defaultdict(dict)
+            
+            # Load all image detections
+            for model_dir in self.labels_dir.iterdir():
+                if model_dir.is_dir() and model_dir.name not in ["unified", "__pycache__", "GT"]:
+                    model_name = model_dir.name
+                    
+                    for txt_file in model_dir.glob("*.txt"):
+                        image_name = txt_file.stem
+                        detections = read_detections(str(txt_file), model_name, 1.0, image_name)
+                        image_detections[image_name][model_name] = detections
+        
+        strategy = self.strategies[strategy_name]
+        results = {}
+        
+        # Process each image separately
+        for image_name, model_dets in image_detections.items():
+            # Run strategy on this image's detections
+            if model_dets:  # Only process if we have detections for this image
+                merged = strategy.merge(model_dets, **kwargs)
+                
+                # Ensure all merged detections have the correct image_name
+                for det in merged:
+                    det.image_name = image_name
+                
+                results[image_name] = merged
         
         return results
     

@@ -11,6 +11,7 @@ from pathlib import Path
 import numpy as np
 from collections import defaultdict, Counter
 import json
+from tqdm import tqdm
 
 from detection_fusion.core.detection import Detection
 from detection_fusion.core.ensemble import AdvancedEnsemble
@@ -58,7 +59,7 @@ class GTRectifier:
     - maximize_error: Aggressive approach, identifies more potential issues for review
     """
     
-    def __init__(self, labels_dir: str, gt_dir: str, images_dir: str,
+    def __init__(self, labels_dir: str, gt_dir: str, images_dir: str, output_dir: str,
                  iou_threshold: float = 0.5, confidence_threshold: float = 0.3,
                  min_strategy_agreement: int = 3, mode: str = "minimize_error"):
         """
@@ -68,6 +69,7 @@ class GTRectifier:
             labels_dir: Directory containing model predictions
             gt_dir: Directory containing ground truth labels
             images_dir: Directory containing images
+            output_dir: Directory for ensemble outputs
             iou_threshold: IoU threshold for matching detections
             confidence_threshold: Minimum confidence for considering detections
             min_strategy_agreement: Minimum strategies that must agree for consensus
@@ -78,6 +80,7 @@ class GTRectifier:
         self.labels_dir = labels_dir
         self.gt_dir = gt_dir
         self.images_dir = images_dir
+        self.output_dir = output_dir
         self.iou_threshold = iou_threshold
         self.confidence_threshold = confidence_threshold
         self.min_strategy_agreement = min_strategy_agreement
@@ -91,8 +94,8 @@ class GTRectifier:
         self._setup_mode_parameters()
         
         # Initialize ensemble and evaluator
-        self.ensemble = AdvancedEnsemble(labels_dir)
-        self.evaluator = Evaluator(gt_dir, iou_threshold)
+        self.ensemble = AdvancedEnsemble(labels_dir, output_dir, gt_dir)
+        self.evaluator = Evaluator(iou_threshold=iou_threshold, gt_dir=gt_dir)
         
         # Storage for analysis results
         self.rectification_errors: List[GTRectificationError] = []
@@ -117,15 +120,42 @@ class GTRectifier:
             self.isolation_weight = 0.7              # Higher emphasis on isolation
             self.min_error_reports = 1               # Single error indicator sufficient
     
-    def load_data(self, detection_filename: str = "detections.txt") -> None:
-        """Load all required data for rectification analysis."""
+    def load_data(self, detection_filename: str = "detections.txt", image_mode: bool = True) -> None:
+        """Load all required data for rectification analysis.
+        
+        Args:
+            detection_filename: Name of detection file (used in single-file mode)
+            image_mode: If True, load per-image detections; if False, use single file per model
+        """
         print("Loading model predictions...")
-        self.ensemble.load_detections(detection_filename)
+        if image_mode:
+            # Load all image detections
+            self.ensemble.load_all_image_detections()
+            self.image_detections = self._organize_detections_by_image()
+        else:
+            # Legacy single-file mode
+            self.ensemble.load_detections(detection_filename)
+            self.image_detections = None
         
         print("Loading ground truth data...")
         self.evaluator.load_ground_truth()
         
         print(f"Loaded {len(self.ensemble.models)} models and GT for {len(self.evaluator.ground_truth)} images")
+    
+    def _organize_detections_by_image(self) -> Dict[str, Dict[str, List[Detection]]]:
+        """Organize loaded detections by image name."""
+        from collections import defaultdict
+        image_detections = defaultdict(dict)
+        
+        # The ensemble has already loaded detections with image_name set
+        for model_name, detections in self.ensemble.detections.items():
+            for det in detections:
+                if det.image_name:
+                    if model_name not in image_detections[det.image_name]:
+                        image_detections[det.image_name][model_name] = []
+                    image_detections[det.image_name][model_name].append(det)
+        
+        return dict(image_detections)
     
     def run_all_strategies(self) -> Dict[str, Dict[str, List[Detection]]]:
         """
@@ -136,25 +166,39 @@ class GTRectifier:
         """
         print("Running all ensemble strategies...")
         
-        # Get all strategy results
-        strategy_results = self.ensemble.run_all_strategies(save_results=False)
-        
-        # Organize by image name (assuming single image analysis)
-        # For batch processing, we'll need to organize by image
         organized_results = {}
         
-        for strategy_name, detections in strategy_results.items():
-            organized_results[strategy_name] = {}
+        if self.image_detections:
+            # Image mode: run strategies per image
+            for strategy_name in tqdm(self.ensemble.strategies.keys(), desc="Running strategies"):
+                organized_results[strategy_name] = {}
+                
+                # Process each image separately
+                for image_name, model_dets in self.image_detections.items():
+                    if model_dets:  # Only process if we have detections
+                        strategy = self.ensemble.strategies[strategy_name]
+                        merged = strategy.merge(model_dets)
+                        
+                        # Ensure detections have image_name set
+                        for det in merged:
+                            det.image_name = image_name
+                        
+                        organized_results[strategy_name][image_name] = merged
+        else:
+            # Legacy mode: use existing method
+            strategy_results = self.ensemble.run_all_strategies(save_results=False)
             
-            # Group detections by image (if detection has image_name attribute)
-            # For now, assume single image or use filename from detection source
-            image_groups = defaultdict(list)
-            for detection in detections:
-                # Extract image name from model source or use default
-                image_name = getattr(detection, 'image_name', 'default_image')
-                image_groups[image_name].append(detection)
-            
-            organized_results[strategy_name] = dict(image_groups)
+            # Organize by image name
+            for strategy_name, detections in strategy_results.items():
+                organized_results[strategy_name] = {}
+                
+                # Group detections by image
+                image_groups = defaultdict(list)
+                for detection in detections:
+                    image_name = getattr(detection, 'image_name', 'default_image')
+                    image_groups[image_name].append(detection)
+                
+                organized_results[strategy_name] = dict(image_groups)
         
         self.strategy_results = organized_results
         return organized_results
@@ -413,12 +457,13 @@ class GTRectifier:
         
         return min(avg_distance / (image_diagonal / 4), 1.0)
     
-    def run_full_analysis(self, detection_filename: str = "detections.txt") -> Dict[str, Any]:
+    def run_full_analysis(self, detection_filename: str = "detections.txt", image_mode: bool = True) -> Dict[str, Any]:
         """
         Run complete GT rectification analysis.
         
         Args:
             detection_filename: Name of detection files to analyze
+            image_mode: If True, use per-image detection files
             
         Returns:
             Complete analysis results
@@ -426,7 +471,7 @@ class GTRectifier:
         print("Starting GT Rectification Analysis...")
         
         # Load data
-        self.load_data(detection_filename)
+        self.load_data(detection_filename, image_mode)
         
         # Run all strategies
         self.run_all_strategies()
@@ -445,7 +490,7 @@ class GTRectifier:
         
         print(f"Analyzing {len(all_images)} images...")
         
-        for image_name in all_images:
+        for image_name in tqdm(all_images, desc="Analyzing images"):
             print(f"Analyzing image: {image_name}")
             
             # Analyze errors for this image
@@ -476,34 +521,114 @@ class GTRectifier:
     
     def _calculate_image_correctness_score(self, image_name: str, 
                                          image_errors: List[GTRectificationError]) -> float:
-        """Calculate overall correctness score for an image (0-1, higher is better)."""
-        if not image_errors:
-            return 1.0
+        """
+        Calculate F1-based correctness score for an image accounting for both 
+        missing labels (recall) and extra labels (precision).
         
-        # Weight errors by their confidence
-        total_error_weight = sum(error.confidence_score for error in image_errors)
+        Returns:
+            F1-based correctness score (0-1, higher is better)
+        """
+        # Get GT and consensus detections for this image
+        gt_detections = self.evaluator.ground_truth.get(image_name, [])
+        consensus_detections = self.build_consensus(image_name)
         
-        # Get total number of GT detections for normalization
-        gt_count = len(self.evaluator.ground_truth.get(image_name, []))
+        if not gt_detections and not consensus_detections:
+            return 1.0  # Perfect match: both empty
         
-        if gt_count == 0:
-            return 0.0 if total_error_weight > 0 else 1.0
+        if not gt_detections:
+            return 0.0  # No GT but consensus has detections (all false positives)
         
-        # Normalize error weight by GT count
-        normalized_error = total_error_weight / gt_count
+        if not consensus_detections:
+            return 0.0  # GT has detections but no consensus (all false negatives)
         
-        # Convert to correctness score (inverted)
-        correctness_score = max(0.0, 1.0 - normalized_error)
+        # Calculate matches using IoU threshold
+        from detection_fusion.utils.metrics import calculate_iou
         
-        return correctness_score
+        gt_matched = set()
+        consensus_matched = set()
+        
+        # Find matches between GT and consensus
+        for i, gt_det in enumerate(gt_detections):
+            for j, cons_det in enumerate(consensus_detections):
+                if gt_det.class_id == cons_det.class_id:
+                    iou = calculate_iou(gt_det.bbox, cons_det.bbox)
+                    if iou > self.iou_threshold:
+                        gt_matched.add(i)
+                        consensus_matched.add(j)
+                        break  # Each GT detection matches at most one consensus
+        
+        # Calculate precision, recall, and F1
+        true_positives = len(gt_matched)
+        false_positives = len(consensus_detections) - len(consensus_matched)
+        false_negatives = len(gt_detections) - len(gt_matched)
+        
+        # Calculate precision and recall
+        precision = true_positives / (true_positives + false_positives) if (true_positives + false_positives) > 0 else 0.0
+        recall = true_positives / (true_positives + false_negatives) if (true_positives + false_negatives) > 0 else 0.0
+        
+        # Calculate F1 score
+        if precision + recall == 0:
+            return 0.0
+        
+        f1_score = 2 * (precision * recall) / (precision + recall)
+        
+        return f1_score
+    
+    def _calculate_detailed_f1_metrics(self, image_name: str) -> Dict[str, float]:
+        """Calculate detailed F1 metrics (precision, recall, TP, FP, FN) for an image."""
+        # Get GT and consensus detections for this image
+        gt_detections = self.evaluator.ground_truth.get(image_name, [])
+        consensus_detections = self.build_consensus(image_name)
+        
+        if not gt_detections and not consensus_detections:
+            return {'precision': 1.0, 'recall': 1.0, 'true_positives': 0, 'false_positives': 0, 'false_negatives': 0}
+        
+        if not gt_detections:
+            return {'precision': 0.0, 'recall': 1.0, 'true_positives': 0, 'false_positives': len(consensus_detections), 'false_negatives': 0}
+        
+        if not consensus_detections:
+            return {'precision': 1.0, 'recall': 0.0, 'true_positives': 0, 'false_positives': 0, 'false_negatives': len(gt_detections)}
+        
+        # Calculate matches using IoU threshold
+        from detection_fusion.utils.metrics import calculate_iou
+        
+        gt_matched = set()
+        consensus_matched = set()
+        
+        # Find matches between GT and consensus
+        for i, gt_det in enumerate(gt_detections):
+            for j, cons_det in enumerate(consensus_detections):
+                if gt_det.class_id == cons_det.class_id:
+                    iou = calculate_iou(gt_det.bbox, cons_det.bbox)
+                    if iou > self.iou_threshold:
+                        gt_matched.add(i)
+                        consensus_matched.add(j)
+                        break  # Each GT detection matches at most one consensus
+        
+        # Calculate metrics
+        true_positives = len(gt_matched)
+        false_positives = len(consensus_detections) - len(consensus_matched)
+        false_negatives = len(gt_detections) - len(gt_matched)
+        
+        # Calculate precision and recall
+        precision = true_positives / (true_positives + false_positives) if (true_positives + false_positives) > 0 else 1.0
+        recall = true_positives / (true_positives + false_negatives) if (true_positives + false_negatives) > 0 else 1.0
+        
+        return {
+            'precision': precision,
+            'recall': recall,
+            'true_positives': true_positives,
+            'false_positives': false_positives,
+            'false_negatives': false_negatives
+        }
     
     def _get_most_problematic_images(self, top_n: int) -> List[Tuple[str, float]]:
-        """Get images with lowest correctness scores."""
+        """Get images with lowest F1-based correctness scores."""
         sorted_images = sorted(self.image_scores.items(), key=lambda x: x[1])
         return sorted_images[:top_n]
     
     def _get_most_reliable_images(self, top_n: int) -> List[Tuple[str, float]]:
-        """Get images with highest correctness scores."""
+        """Get images with highest F1-based correctness scores."""
         sorted_images = sorted(self.image_scores.items(), key=lambda x: x[1], reverse=True)
         return sorted_images[:top_n]
     
@@ -531,6 +656,7 @@ class GTRectifier:
             (subdir / "images").mkdir(parents=True, exist_ok=True)
             (subdir / "labels").mkdir(parents=True, exist_ok=True)
             (subdir / "analysis").mkdir(parents=True, exist_ok=True)
+            (subdir / "unified").mkdir(parents=True, exist_ok=True)
         
         # Get most reliable and problematic images
         most_reliable = self._get_most_reliable_images(include_most_correct)
@@ -553,7 +679,7 @@ class GTRectifier:
                            target_dir: Path, dataset_type: str) -> None:
         """Copy images and labels to target directory."""
         
-        for i, (image_name, score) in enumerate(image_list):
+        for i, (image_name, score) in enumerate(tqdm(image_list, desc=f"Copying {dataset_type} dataset")):
             # Copy image if it exists
             image_extensions = ['.jpg', '.jpeg', '.png', '.bmp', '.tiff']
             image_copied = False
@@ -578,6 +704,12 @@ class GTRectifier:
             # Generate analysis file
             analysis_file = target_dir / "analysis" / f"{i:03d}_{image_name}_analysis.json"
             self._generate_image_analysis(image_name, score, analysis_file)
+            
+            # Save consensus detections as unified predictions
+            consensus_detections = self.build_consensus(image_name)
+            if consensus_detections:
+                unified_label = target_dir / "unified" / f"{i:03d}_{image_name}.txt"
+                save_detections(consensus_detections, str(unified_label))
     
     def _generate_image_analysis(self, image_name: str, score: float, 
                                output_file: Path) -> None:
@@ -590,9 +722,17 @@ class GTRectifier:
         gt_detections = self.evaluator.ground_truth.get(image_name, [])
         consensus_detections = self.build_consensus(image_name)
         
+        # Calculate detailed F1 metrics for this image
+        f1_metrics = self._calculate_detailed_f1_metrics(image_name)
+        
         analysis = {
             'image_name': image_name,
-            'correctness_score': score,
+            'f1_score': score,  # This is now the F1-based correctness score
+            'precision': f1_metrics['precision'],
+            'recall': f1_metrics['recall'],
+            'true_positives': f1_metrics['true_positives'],
+            'false_positives': f1_metrics['false_positives'],
+            'false_negatives': f1_metrics['false_negatives'],
             'gt_detection_count': len(gt_detections),
             'consensus_detection_count': len(consensus_detections),
             'errors_found': len(image_errors),
@@ -723,14 +863,16 @@ class GTRectifier:
                 "Consider additional training or clearer guidelines for these classes."
             )
         
-        # Overall quality assessment
-        avg_score = np.mean(list(self.image_scores.values()))
-        if avg_score > 0.8:
-            recommendations.append("Overall dataset quality appears good (>80% correctness).")
-        elif avg_score > 0.6:
-            recommendations.append("Dataset quality is moderate (60-80% correctness). Consider selective re-annotation.")
+        # Overall quality assessment based on F1 scores
+        avg_f1_score = np.mean(list(self.image_scores.values()))
+        if avg_f1_score > 0.9:
+            recommendations.append(f"Excellent dataset quality! Average F1 score: {avg_f1_score:.3f} (>90%).")
+        elif avg_f1_score > 0.8:
+            recommendations.append(f"Good dataset quality. Average F1 score: {avg_f1_score:.3f} (>80%).")
+        elif avg_f1_score > 0.6:
+            recommendations.append(f"Moderate dataset quality. Average F1 score: {avg_f1_score:.3f}. Consider reviewing annotations.")
         else:
-            recommendations.append("Dataset quality needs significant improvement (<60% correctness). Consider comprehensive review.")
+            recommendations.append(f"Dataset quality needs improvement. Average F1 score: {avg_f1_score:.3f} (<60%).")
         
         return recommendations
     
@@ -751,7 +893,8 @@ class GTRectifier:
             f.write(f"Total Errors Found: {info['total_errors_found']}\n")
             f.write(f"Most Reliable Images: {info['most_reliable_count']}\n")
             f.write(f"Most Problematic Images: {info['most_problematic_count']}\n")
-            f.write(f"Analysis Mode: {info['analysis_parameters']['mode']}\n\n")
+            f.write(f"Analysis Mode: {info['analysis_parameters']['mode']}\n")
+            f.write(f"Scoring Method: F1-based (precision & recall)\n\n")
             
             # Error statistics
             f.write("ERROR STATISTICS\n")
@@ -796,7 +939,7 @@ def main():
     from pathlib import Path
     
     parser = argparse.ArgumentParser(
-        description="DetectionFusion GT Rectification System",
+        description="DetectionFusion GT Rectification System (image-by-image mode by default)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -824,14 +967,22 @@ Examples:
 Directory Structure Expected:
   labels/
     ├── model1/
-    │   └── detections.txt
+    │   ├── image1.txt  (image mode - default)
+    │   ├── image2.txt
+    │   └── ...
     ├── model2/
-    │   └── detections.txt
+    │   ├── image1.txt
+    │   ├── image2.txt
+    │   └── ...
     └── model3/
-        └── detections.txt
+        ├── image1.txt
+        ├── image2.txt
+        └── ...
   
   gt/
-    └── detections.txt (or individual image files)
+    ├── image1.txt  (or GT/detections.txt for single file)
+    ├── image2.txt
+    └── ...
   
   images/
     ├── image1.jpg
@@ -933,6 +1084,11 @@ Output Structure:
         action="store_true", 
         help="Only run analysis without creating rectified dataset"
     )
+    parser.add_argument(
+        "--single-file-mode",
+        action="store_true",
+        help="Use single detection file per model (legacy behavior, default is image-by-image)"
+    )
     
     args = parser.parse_args()
     
@@ -964,10 +1120,10 @@ Output Structure:
         return config_value if config_value is not None else default_value
     
     # Extract configuration values
-    labels_dir = get_config_value('labels-dir', 'gt_rectification.labels_dir')
-    gt_dir = get_config_value('gt-dir', 'gt_rectification.gt_dir')
-    images_dir = get_config_value('images-dir', 'gt_rectification.images_dir')
-    output_dir = get_config_value('output-dir', 'gt_rectification.output_dir')
+    labels_dir = get_config_value('labels-dir', 'gt_rectification.labels_dir', 'labels')
+    gt_dir = get_config_value('gt-dir', 'gt_rectification.gt_dir', 'labels/GT')
+    images_dir = get_config_value('images-dir', 'gt_rectification.images_dir', 'images')
+    output_dir = get_config_value('output-dir', 'gt_rectification.output_dir', 'rectified_dataset')
     
     # Validate required parameters
     if not all([labels_dir, gt_dir, images_dir, output_dir]):
@@ -1050,18 +1206,20 @@ Output Structure:
         # Initialize rectifier
         print("Initializing GT Rectifier...")
         rectifier = GTRectifier(
-            args.labels_dir, 
-            args.gt_dir, 
-            args.images_dir,
-            args.iou_threshold, 
-            args.confidence_threshold, 
-            args.min_strategy_agreement,
-            args.mode
+            labels_dir, 
+            gt_dir, 
+            images_dir,
+            output_dir,
+            iou_threshold, 
+            confidence_threshold, 
+            min_strategy_agreement,
+            mode
         )
         
         # Run analysis
         print("Running comprehensive GT rectification analysis...")
-        results = rectifier.run_full_analysis(args.detection_file)
+        image_mode = not args.single_file_mode  # Use image mode by default
+        results = rectifier.run_full_analysis(args.detection_file, image_mode)
         
         # Print summary results
         print("\n" + "=" * 60)
@@ -1074,11 +1232,11 @@ Output Structure:
         for error_type, count in results['error_types'].items():
             print(f"  {error_type}: {count}")
         
-        print("\nMost problematic images (lowest correctness scores):")
+        print("\nMost problematic images (lowest F1 scores):")
         for image_name, score in results['most_problematic_images']:
             print(f"  {image_name}: {score:.3f}")
         
-        print("\nMost reliable images (highest correctness scores):")
+        print("\nMost reliable images (highest F1 scores):")
         for image_name, score in results['most_reliable_images']:
             print(f"  {image_name}: {score:.3f}")
         

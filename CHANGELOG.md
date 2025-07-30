@@ -13,7 +13,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Uncertainty quantification
 - Web-based visualization dashboard
 
+## [0.2.1] - 2025-07-30
+
+### Fixed
+- **Documentation Accuracy**: Comprehensive review and correction of all documentation files
+- **Strategy Count Accuracy**: Updated documentation to reflect actual 19 strategies (was incorrectly showing 17+)
+- **Example Corrections**: Fixed all code examples, import statements, and CLI command examples to match actual implementation
+- **CLI Workflow Clarity**: Clarified that GT evaluation is done via val.py, then merge.py for ensemble execution
+- **Import Path Corrections**: Fixed import statements and file paths throughout documentation
+- **Consistency Improvements**: Ensured terminology, version numbers, and examples are consistent across all files
+- **Category Count Corrections**: Fixed strategy category counts (Basic Voting: 5 strategies, Confidence-Based: 2 strategies)
+
+### Added
+- **Enhanced F1-Based Scoring Documentation**: Detailed documentation of F1-based quality assessment in GT rectification
+- **Complete Documentation Verification**: All code examples verified to work with actual codebase
+- **Professional Documentation Quality**: Documentation now meets production-ready standards
+
 ## [0.2.0] - 2025-07-30
+
+### Changed
+- **val.py**: Image-by-image comparison is now the default mode (each .txt file represents detections for one image)
+- Added `--single-file-mode` flag to use legacy single detection file per model behavior
+
+### Fixed
+- **Detection Class Hashability**: Added `__hash__` and `__eq__` methods to Detection class to enable use in sets and dictionaries, resolving "unhashable type: 'Detection'" errors
+- **GT Rectifier Initialization**: Fixed AdvancedEnsemble constructor parameters in GTRectifier to include required `output_dir` parameter
+- **Evaluator Parameter Order**: Corrected Evaluator initialization to use keyword arguments matching the constructor signature
+- **Configuration Value Extraction**: Added proper default values to `get_config_value()` calls to prevent NoneType errors during initialization
+- **Progress Bar Integration**: Comprehensive tqdm progress tracking throughout the entire codebase for better user experience
+- **GT Confidence Warnings**: Suppressed misleading "missing confidence values" warnings for ground truth files (GT files should not have confidence values)
+- **F1-Based Correctness Scoring**: Replaced naive error-count scoring with proper F1-based correctness scores that account for both precision (extra labels) and recall (missing labels), providing more realistic and actionable quality assessments
 
 ### Added
 
@@ -114,15 +143,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `--metrics` for selecting specific evaluation metrics
 - New analysis types: "evaluation" and "error-analysis"
 - Comprehensive GT evaluation reporting in multiple formats
+- **Real-time progress tracking** with tqdm for all analysis operations
 
 ##### merge.py (Ensemble Tool)
-- `--gt` parameter for GT-guided strategy selection
-- `--auto-strategy` for automatic optimal strategy selection
-- `--optimize-strategy` for GT-based strategy optimization
-- `--evaluation-metric` for choosing optimization criteria (map_50, f1_score, precision, recall)
-- **Ground truth-guided workflow** with intelligent fallback mechanisms
-- **Strategy performance comparison** with detailed GT metrics display
-- **Enhanced reporting** showing strategy performance vs ground truth
+- Enhanced ensemble workflow (GT evaluation done via val.py, then merge.py for execution)
+- Multiple strategy execution and comparison capabilities
+- Comprehensive parameter control (IoU, confidence, min votes)
+- **Professional ensemble merging** with detailed progress indicators
+- **Strategy performance comparison** (via companion val.py for GT analysis)
+- **Enhanced reporting** and output formatting options
+- **Progressive feedback** with detailed progress indicators for ensemble operations
 
 ##### gt_rectify.py (Rectification Tool) 
 - Comprehensive CLI for GT error detection and dataset organization
@@ -130,6 +160,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Extensive parameter customization (IoU thresholds, confidence levels, strategy agreement)
 - Directory validation and progress reporting
 - Mode-aware recommendations and analysis interpretation
+- **Comprehensive progress tracking** for model loading, GT processing, strategy execution, and image analysis
+- **Enhanced F1-based quality assessment** with detailed precision/recall metrics in individual image analysis files
 
 #### Enhanced Examples and Documentation
 - **Advanced Strategy Demo**: Comprehensive demonstration of all new strategies
@@ -175,7 +207,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Enhanced scikit-learn usage for distance calculations in clustering strategies
 
 ### Total Package Stats (v0.2.0)
-- **17+ Ensemble Strategies**: Comprehensive coverage of all ensemble approaches
+- **19 Ensemble Strategies**: Comprehensive coverage of all ensemble approaches
 - **6 Strategy Categories**: From basic voting to advanced adaptive methods
 - **9 Specialized Configs**: Ready-to-use configurations organized in logical directories:
   - 5 ensemble configurations (default, high-precision, high-recall, small-objects, advanced-strategies)

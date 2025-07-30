@@ -3,6 +3,7 @@ import pandas as pd
 from typing import Dict, List, Optional, Any
 from collections import defaultdict, Counter
 from pathlib import Path
+from tqdm import tqdm
 
 from .detection import Detection
 from ..utils.io import read_detections, load_class_names, load_ground_truth, validate_ground_truth_structure
@@ -24,7 +25,7 @@ class MultiModelAnalyzer:
         self.ground_truth = {}
         self._gt_cache = {}
     
-    def load_detections(self, filename: str = "detections.txt") -> Dict[str, List[Detection]]:
+    def load_detections(self, filename: str = "detections.txt", default_confidence: float = 1.0) -> Dict[str, List[Detection]]:
         """Load detections from all model directories."""
         self.models = []
         self.detections = {}
@@ -36,12 +37,45 @@ class MultiModelAnalyzer:
                 file_path = model_dir / filename
                 
                 if file_path.exists():
-                    self.detections[model_name] = read_detections(str(file_path), model_name)
+                    self.detections[model_name] = read_detections(str(file_path), model_name, default_confidence)
                 else:
                     print(f"Warning: {file_path} not found")
                     self.detections[model_name] = []
         
         return self.detections
+    
+    def load_all_image_detections(self, default_confidence: float = 1.0) -> Dict[str, Dict[str, List[Detection]]]:
+        """Load detections for all images from all model directories.
+        
+        Args:
+            default_confidence: Default confidence value for detections missing confidence scores
+        
+        Returns:
+            Dict with structure: {image_name: {model_name: [detections]}}
+        """
+        self.models = []
+        self.image_detections = defaultdict(dict)
+        
+        # Find all model directories
+        model_dirs = [d for d in self.labels_dir.iterdir() 
+                     if d.is_dir() and d.name not in ["unified", "__pycache__", "GT"]]
+        
+        print(f"Loading detections from {len(model_dirs)} models...")
+        for model_dir in tqdm(model_dirs, desc="Loading models"):
+            model_name = model_dir.name
+            self.models.append(model_name)
+            
+            # Count txt files first for progress bar
+            txt_files = list(model_dir.glob("*.txt"))
+            
+            # Load all .txt files in the model directory
+            for txt_file in tqdm(txt_files, desc=f"  {model_name}", leave=False):
+                image_name = txt_file.stem
+                detections = read_detections(str(txt_file), model_name, default_confidence, image_name)
+                self.image_detections[image_name][model_name] = detections
+        
+        # Convert to regular dict for return
+        return dict(self.image_detections)
     
     def load_class_names(self, class_names_file: Optional[str] = None):
         """Load class names from file."""

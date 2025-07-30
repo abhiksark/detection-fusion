@@ -245,6 +245,65 @@ with mp.Pool(4) as pool:
     results = pool.map(parallel_strategy, strategy_names)
 ```
 
+## 🐛 Recently Fixed Issues (v0.2.0)
+
+### Issue: "unhashable type: 'Detection'" Error
+**Fixed in v0.2.0**: Detection objects can now be used in sets and dictionaries.
+
+**Problem**: When running gt_rectify.py or certain ensemble operations, you might encounter:
+```
+TypeError: unhashable type: 'Detection'
+```
+
+**Solution**: This has been resolved by adding `__hash__` and `__eq__` methods to the Detection class. Update to v0.2.0 or later.
+
+```python
+# Now works correctly:
+detection_set = set(detections)
+detection_dict = {detection: confidence for detection, confidence in zip(detections, confidences)}
+```
+
+### Issue: GT Rectifier Initialization Errors
+**Fixed in v0.2.0**: Proper parameter handling in GTRectifier initialization.
+
+**Problem**: GT rectification failing with parameter errors like:
+```
+expected str, bytes or os.PathLike object, not NoneType
+```
+
+**Solution**: Fixed AdvancedEnsemble parameter passing and config value extraction:
+
+```python
+# Old (problematic) - Fixed in v0.2.0
+ensemble = AdvancedEnsemble(labels_dir)  # Missing output_dir parameter
+
+# New (correct) - Works in v0.2.0
+ensemble = AdvancedEnsemble(labels_dir, output_dir, gt_dir)
+```
+
+### Issue: Configuration Loading Problems
+**Fixed in v0.2.0**: Robust configuration value extraction with proper defaults.
+
+**Problem**: Configuration files not being read correctly, resulting in None values.
+
+**Solution**: Enhanced `get_config_value()` function with proper fallback mechanisms:
+
+```python
+# Now includes proper defaults
+labels_dir = get_config_value('labels-dir', 'gt_rectification.labels_dir', 'labels')
+```
+
+### Issue: Progress Tracking Missing
+**Fixed in v0.2.0**: Comprehensive tqdm integration throughout the codebase.
+
+**Problem**: Long-running operations without progress feedback.
+
+**Solution**: All CLI tools now include real-time progress bars:
+- Model loading: `Loading models: 100%|██████████| 4/4`
+- GT processing: `Loading GT: 100%|██████████| 2010/2010`
+- Strategy execution: `Running strategies: 100%|██████████| 17/17`
+- Image analysis: `Analyzing images: 100%|██████████| 150/150`
+
 ## 🎯 Strategy-Specific Issues
 
 ### Issue: No Detections from Ensemble

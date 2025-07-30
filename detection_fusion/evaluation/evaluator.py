@@ -7,8 +7,10 @@ evaluation workflows including metrics calculation, error analysis, and reportin
 
 import os
 import json
+import glob
 from typing import List, Dict
 import numpy as np
+from tqdm import tqdm
 
 from ..core.detection import Detection
 from ..utils.io import read_detections
@@ -48,6 +50,7 @@ class Evaluator:
         
         # Cache for ground truth data
         self._gt_cache = {}
+        self.ground_truth = {}  # For per-image GT storage
         
     def load_ground_truth(self, gt_file: str = "detections.txt") -> List[Detection]:
         """
@@ -62,11 +65,33 @@ class Evaluator:
         if gt_file not in self._gt_cache:
             gt_path = os.path.join(self.gt_dir, gt_file)
             if not os.path.exists(gt_path):
-                raise FileNotFoundError(f"Ground truth file not found: {gt_path}")
+                # Try loading per-image GT files
+                return self._load_per_image_ground_truth()
             
             self._gt_cache[gt_file] = read_detections(gt_path, model_source="GT")
         
         return self._gt_cache[gt_file]
+    
+    def _load_per_image_ground_truth(self) -> List[Detection]:
+        """Load ground truth from per-image files."""
+        all_gt_detections = []
+        
+        # Load all .txt files from GT directory
+        gt_files = glob.glob(os.path.join(self.gt_dir, "*.txt"))
+        
+        if not gt_files:
+            raise FileNotFoundError(f"No ground truth files found in {self.gt_dir}")
+        
+        print(f"Loading ground truth from {len(gt_files)} image files...")
+        for gt_file in tqdm(gt_files, desc="Loading GT", leave=False):
+            image_name = os.path.splitext(os.path.basename(gt_file))[0]
+            detections = read_detections(gt_file, "GT", 1.0, image_name)
+            
+            # Store per-image GT
+            self.ground_truth[image_name] = detections
+            all_gt_detections.extend(detections)
+        
+        return all_gt_detections
     
     def evaluate_predictions(
         self,
@@ -175,7 +200,7 @@ class Evaluator:
         """
         evaluation_results = {}
         
-        for strategy_name, predictions in strategy_results.items():
+        for strategy_name, predictions in tqdm(strategy_results.items(), desc="Evaluating strategies"):
             try:
                 evaluation_results[strategy_name] = self.evaluate_predictions(
                     predictions, gt_file, include_error_analysis=True
@@ -210,7 +235,7 @@ class Evaluator:
         
         # Evaluate individual models
         model_results = {}
-        for model_name, predictions in model_predictions.items():
+        for model_name, predictions in tqdm(model_predictions.items(), desc="Evaluating models"):
             model_results[model_name] = self.evaluate_predictions(predictions, gt_file)
         
         # Calculate improvement metrics

@@ -9,7 +9,7 @@ configs/
 ├── README.md                          # This file
 ├── ensemble/                          # Ensemble and analysis configurations
 │   ├── default_config.yaml           # Default ensemble configuration
-│   ├── advanced_strategies_config.yaml # All 17+ strategies showcase
+│   ├── advanced_strategies_config.yaml # All 19 strategies showcase
 │   ├── high_precision_config.yaml    # Conservative strategies for critical applications
 │   ├── high_recall_config.yaml       # Permissive strategies for maximum detection
 │   └── small_objects_config.yaml     # Optimized for small object detection
@@ -33,7 +33,7 @@ Located in `configs/ensemble/` - Used with `merge.py`, `val.py`, and Python API.
   ```
 
 ### `advanced_strategies_config.yaml`
-- **Purpose**: Demonstrates all 17+ available ensemble strategies
+- **Purpose**: Demonstrates all 19 available ensemble strategies
 - **Best for**: Strategy comparison and performance analysis
 - **Usage**:
   ```bash

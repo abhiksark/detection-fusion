@@ -20,6 +20,7 @@ from typing import List, Dict
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+from tqdm import tqdm
 
 from detection_fusion import MultiModelAnalyzer, AdvancedEnsemble, Evaluator, StrategyOptimizer
 from detection_fusion.utils import load_yaml_config, validate_ground_truth_structure
@@ -30,27 +31,33 @@ from detection_fusion.core.detection import Detection
 def parse_args():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
-        description="Assess and analyze object detection models",
+        description="Assess and analyze object detection models (image-by-image comparison by default)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Basic model assessment
-  python assess.py --models model1 model2 model3 --analyze agreement
+  # Basic model assessment (image-by-image comparison by default)
+  python val.py --models model1 model2 model3 --analyze agreement
 
-  # Comprehensive analysis with plots
-  python assess.py --models-dir labels/ --report full --plot --save-plots results/
+  # Comprehensive analysis with plots (image mode)
+  python val.py --models-dir labels/ --report full --plot --save-plots results/
+
+  # Use single detection file per model (legacy mode)
+  python val.py --models model1 model2 --single-file-mode --analyze agreement
+
+  # Handle detections with missing confidence values  
+  python val.py --models model1 model2 --default-confidence 0.8
 
   # Compare specific strategies
-  python assess.py --models model1 model2 --strategies weighted_vote bayesian --compare strategies
+  python val.py --models model1 model2 --strategies weighted_vote bayesian --compare strategies
 
   # Pairwise model comparison
-  python assess.py --models-dir labels/ --compare pairwise --metric iou
+  python val.py --models-dir labels/ --compare pairwise --metric iou
 
   # Class-wise analysis
-  python assess.py --models model1 model2 model3 --analyze class-wise --classes person car bike
+  python val.py --models model1 model2 model3 --analyze class-wise --classes person car bike
 
   # Confidence analysis
-  python assess.py --models-dir labels/ --analyze confidence --confidence-bins 10
+  python val.py --models-dir labels/ --analyze confidence --confidence-bins 10
         """
     )
     
@@ -110,6 +117,12 @@ Examples:
         type=float,
         default=0.1,
         help="Minimum confidence threshold (default: 0.1)"
+    )
+    parser.add_argument(
+        "--default-confidence",
+        type=float,
+        default=1.0,
+        help="Default confidence value for detections missing confidence scores"
     )
     parser.add_argument(
         "--confidence-bins", 
@@ -196,6 +209,11 @@ Examples:
         action="store_true",
         help="Quiet mode"
     )
+    parser.add_argument(
+        "--single-file-mode",
+        action="store_true",
+        help="Use single detection file per model (default is image-by-image comparison)"
+    )
     
     return parser.parse_args()
 
@@ -217,35 +235,66 @@ def setup_analyzer(args) -> MultiModelAnalyzer:
 
 def load_and_filter_detections(analyzer: MultiModelAnalyzer, args) -> Dict[str, List[Detection]]:
     """Load and filter detections based on arguments."""
-    if args.models:
-        # Load specific models
+    if not args.single_file_mode:
+        # Load detections for all images
+        image_detections = analyzer.load_all_image_detections(args.default_confidence)
+        
+        # Flatten detections for compatibility with existing code
         detections = {}
-        for model_name in args.models:
-            try:
-                model_detections = analyzer.load_model_detections(model_name)
+        for image_name, model_data in image_detections.items():
+            for model_name, image_dets in model_data.items():
+                if args.models and model_name not in args.models:
+                    continue
+                    
+                if model_name not in detections:
+                    detections[model_name] = []
+                
                 # Apply confidence filtering
+                filtered_dets = [
+                    d for d in image_dets 
+                    if d.confidence >= args.confidence_threshold
+                ]
+                detections[model_name].extend(filtered_dets)
+        
+        if not args.quiet:
+            for model_name, model_dets in detections.items():
+                print(f"✓ {model_name}: {len(model_dets)} total detections across all images")
+        
+        # Store image_detections for later use
+        analyzer.image_detections = image_detections
+        
+    else:
+        # Original behavior - load single detection file per model
+        all_detections = analyzer.load_detections(default_confidence=args.default_confidence)
+        
+        if args.models:
+            # Filter to specific models
+            detections = {}
+            for model_name in args.models:
+                if model_name in all_detections:
+                    model_detections = all_detections[model_name]
+                    # Apply confidence filtering
+                    filtered_detections = [
+                        d for d in model_detections 
+                        if d.confidence >= args.confidence_threshold
+                    ]
+                    detections[model_name] = filtered_detections
+                    
+                    if not args.quiet:
+                        print(f"✓ {model_name}: {len(filtered_detections)} detections "
+                              f"(filtered from {len(model_detections)})")
+                else:
+                    print(f"⚠️  Model '{model_name}' not found")
+                    continue
+        else:
+            # Use all loaded models
+            detections = {}
+            for model_name, model_detections in all_detections.items():
                 filtered_detections = [
                     d for d in model_detections 
                     if d.confidence >= args.confidence_threshold
                 ]
                 detections[model_name] = filtered_detections
-                
-                if not args.quiet:
-                    print(f"✓ {model_name}: {len(filtered_detections)} detections "
-                          f"(filtered from {len(model_detections)})")
-            except FileNotFoundError:
-                print(f"⚠️  Model '{model_name}' not found")
-                continue
-    else:
-        # Load all models
-        analyzer.load_detections("detections.txt")
-        detections = {}
-        for model_name, model_detections in analyzer.detections.items():
-            filtered_detections = [
-                d for d in model_detections 
-                if d.confidence >= args.confidence_threshold
-            ]
-            detections[model_name] = filtered_detections
     
     return detections
 
@@ -684,7 +733,7 @@ def run_gt_evaluation(detections: Dict[str, List[Detection]], args) -> Dict:
     if not args.quiet:
         print(f"📊 Evaluating {len(detections)} models against ground truth...")
     
-    for model_name, model_detections in detections.items():
+    for model_name, model_detections in tqdm(detections.items(), desc="Evaluating models", disable=args.quiet):
         try:
             evaluation = evaluator.evaluate_predictions(
                 model_detections, 

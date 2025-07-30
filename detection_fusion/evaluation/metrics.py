@@ -8,6 +8,7 @@ Average Precision (AP), Mean Average Precision (mAP), precision, recall, and F1 
 import numpy as np
 from typing import List, Dict, Tuple, Optional
 from dataclasses import dataclass
+from tqdm import tqdm
 from collections import defaultdict
 
 from ..core.detection import Detection
@@ -126,7 +127,7 @@ class EvaluationMetrics:
         
         # Evaluate each class
         results = {}
-        for class_id in all_classes:
+        for class_id in tqdm(all_classes, desc="Evaluating classes", leave=False):
             class_predictions = pred_by_class[class_id]
             class_gt = gt_by_class[class_id]
             results[class_id] = self.evaluate(class_predictions, class_gt)
@@ -156,7 +157,7 @@ class EvaluationMetrics:
         # Calculate per-class results for each IoU threshold
         map_scores = []
         
-        for iou_thresh in iou_thresholds:
+        for iou_thresh in tqdm(iou_thresholds, desc="Calculating mAP", leave=False):
             original_threshold = self.iou_threshold
             self.iou_threshold = iou_thresh
             

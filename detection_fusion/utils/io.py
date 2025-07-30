@@ -2,36 +2,57 @@ from pathlib import Path
 from typing import List, Dict, Optional, Tuple
 import json
 import yaml
+from tqdm import tqdm
 
 from ..core.detection import Detection
 
 
-def read_detections(file_path: str, model_name: str = "") -> List[Detection]:
+def read_detections(file_path: str, model_name: str = "", default_confidence: float = 1.0, image_name: str = "") -> List[Detection]:
     """
     Read detections from a text file.
     
     Args:
         file_path: Path to detection file
         model_name: Name of the model that produced these detections
+        default_confidence: Default confidence value for detections missing confidence scores
+        image_name: Name of the image these detections belong to
         
     Returns:
         List of Detection objects
     """
     detections = []
+    missing_conf_count = 0
+    
     with open(file_path, 'r') as file:
-        for line in file:
+        for line_num, line in enumerate(file, 1):
             parts = line.strip().split()
-            if len(parts) >= 6:
+            if len(parts) >= 5:  # At least class_id, x, y, w, h
+                if len(parts) >= 6:
+                    # Full format with confidence
+                    confidence = float(parts[5])
+                else:
+                    # Missing confidence - use default value
+                    confidence = default_confidence
+                    missing_conf_count += 1
+                
                 det = Detection(
                     class_id=int(parts[0]),
                     x=float(parts[1]),
                     y=float(parts[2]),
                     w=float(parts[3]),
                     h=float(parts[4]),
-                    confidence=float(parts[5]),
-                    model_source=model_name
+                    confidence=confidence,
+                    model_source=model_name,
+                    image_name=image_name
                 )
                 detections.append(det)
+            elif len(parts) > 0:  # Skip empty lines but warn about malformed ones
+                print(f"⚠️  Skipping malformed line {line_num} in {file_path}: {line.strip()}")
+    
+    # Inform user about missing confidence values (but not for GT files)
+    if missing_conf_count > 0 and model_name != "GT":
+        print(f"⚠️  {missing_conf_count} detections in {file_path} missing confidence values (using default {default_confidence})")
+    
     return detections
 
 
@@ -219,7 +240,7 @@ def load_detection_batch(
     """
     detections = {}
     
-    for source_name, file_path in detection_files.items():
+    for source_name, file_path in tqdm(detection_files.items(), desc="Loading detection files"):
         if model_names is not None and source_name not in model_names:
             continue
         
@@ -253,7 +274,7 @@ def save_evaluation_results(
         results = results.copy()  # Don't modify original
         results['_metadata'] = {
             'timestamp': datetime.now().isoformat(),
-            'detection_fusion_version': '0.2.0',
+            'detection_fusion_version': '0.2.1',
             'evaluation_framework': 'detection_fusion.evaluation'
         }
     

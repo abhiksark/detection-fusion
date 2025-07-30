@@ -22,6 +22,7 @@ Detection(class_id: int, x: float, y: float, w: float, h: float,
 - `w`, `h`: Width and height (normalized 0-1)
 - `confidence`: Detection confidence score (0-1)
 - `model_source`: Name of the model that produced this detection
+- `image_name`: Image filename this detection belongs to (NEW in v0.2.0)
 
 #### Properties
 ```python
@@ -31,10 +32,14 @@ detection.center        # (x, y) center point
 detection.area          # Bounding box area
 ```
 
-#### Methods
+#### Methods (Enhanced in v0.2.0)
 ```python
-detection.to_dict()                    # Convert to dictionary
-Detection.from_dict(data)              # Create from dictionary
+detection.to_dict()     # Convert to dictionary
+Detection.from_dict(data)  # Create from dictionary
+
+# NEW: Hashable support - can be used in sets and dictionaries
+detection_set = {detection1, detection2}
+detection_dict = {detection: metadata}
 ```
 
 ### `EnsembleVoting`
