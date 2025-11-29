@@ -1,0 +1,16 @@
+# DetectionFusion Default Ensemble Configuration
+# Balanced defaults for general-purpose workflows
+
+overlap:
+  threshold: 0.5
+  method: "iou"
+
+voting:
+  min_votes: 2
+  use_weights: true
+
+confidence:
+  min_threshold: 0.1
+  temperature: 1.0
+
+extra: {}

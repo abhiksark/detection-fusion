@@ -1,6 +1,8 @@
 # Ensemble Strategy Guide
 
-Comprehensive guide to choosing and configuring ensemble strategies for your object detection models. Now featuring **19 advanced strategies** for every use case.
+Comprehensive guide to choosing and configuring ensemble strategies for your object detection models. Featuring **16 ensemble strategies** for every use case.
+
+**Author:** Abhik Sarkar
 
 ## 🎯 Strategy Selection Guide
 
@@ -44,17 +46,17 @@ Comprehensive guide to choosing and configuring ensemble strategies for your obj
 Before diving into Python API details, here are command-line examples for quick usage:
 
 ```bash
+# List available strategies
+detection-fusion list-strategies
+detection-fusion list-strategies --category voting -v
+
 # Try different strategies via CLI
-python merge.py --models model1 model2 model3 --strategy majority_vote_2
-python merge.py --models model1 model2 model3 --strategy weighted_vote  
-python merge.py --models model1 model2 model3 --strategy multi_scale
+detection-fusion merge --input labels/ --strategy majority_vote --output unified/
+detection-fusion merge --input labels/ --strategy weighted_vote --output unified/
+detection-fusion merge --input labels/ --strategy multi_scale --output unified/
 
-# Compare multiple strategies
-python merge.py --models-dir labels/ --strategies majority_vote_2 weighted_vote affirmative_nms
-
-# Use specialized configurations
-python merge.py --config configs/small_objects_config.yaml
-python merge.py --config configs/high_precision_config.yaml
+# With custom IoU threshold
+detection-fusion merge --input labels/ --strategy weighted_vote --iou 0.6 --output unified/
 ```
 
 ### 1. Basic Voting Strategies
@@ -64,19 +66,18 @@ python merge.py --config configs/high_precision_config.yaml
 
 ```bash
 # CLI usage
-python merge.py --models model1 model2 model3 --strategy majority_vote_2 --iou 0.5
-python merge.py --models model1 model2 model3 --strategy majority_vote_3 --iou 0.5
+detection-fusion merge --input labels/ --strategy majority_vote --iou 0.5 --output unified/
 ```
 
 ```python
-# Python API
-from detection_fusion.strategies import MajorityVoting
+# Python API (v1.0)
+from detection_fusion.strategies import create_strategy
 
-# Conservative: Require 3+ models
-strict_voter = MajorityVoting(iou_threshold=0.5, min_votes=3)
+# Conservative: Require 3+ models (adjust via config)
+strict_voter = create_strategy("majority_vote", iou_threshold=0.5)
 
-# Permissive: Require 2+ models  
-permissive_voter = MajorityVoting(iou_threshold=0.5, min_votes=2)
+# Permissive: Lower IoU for more matches
+permissive_voter = create_strategy("majority_vote", iou_threshold=0.3)
 ```
 
 **Parameter tuning**:
@@ -89,13 +90,10 @@ permissive_voter = MajorityVoting(iou_threshold=0.5, min_votes=2)
 **When to use**: When models have different quality levels.
 
 ```python
-from detection_fusion.strategies import WeightedVoting
+from detection_fusion.strategies import create_strategy
 
 # Automatic model weighting based on average confidence
-weighted_voter = WeightedVoting(iou_threshold=0.5, use_model_weights=True)
-
-# Equal weighting (confidence only)
-equal_voter = WeightedVoting(use_model_weights=False)
+weighted_voter = create_strategy("weighted_vote", iou_threshold=0.5)
 ```
 
 **Best practices**:
@@ -109,26 +107,23 @@ equal_voter = WeightedVoting(use_model_weights=False)
 **When to use**: Fast processing, high recall scenarios.
 
 ```python
-from detection_fusion.strategies import NMSStrategy
+from detection_fusion.strategies import create_strategy
 
 # Standard NMS
-nms = NMSStrategy(iou_threshold=0.5, score_threshold=0.1)
+nms = create_strategy("nms", iou_threshold=0.5)
 
 # Aggressive suppression for crowded scenes
-aggressive_nms = NMSStrategy(iou_threshold=0.3, score_threshold=0.3)
+aggressive_nms = create_strategy("nms", iou_threshold=0.3)
 ```
 
 #### Confidence-Weighted NMS
 **When to use**: When you need refined bounding box localization.
 
 ```python
-from detection_fusion.strategies import ConfidenceWeightedNMS
+from detection_fusion.strategies import create_strategy
 
 # Higher confidence gets more influence in box regression
-conf_nms = ConfidenceWeightedNMS(iou_threshold=0.5, confidence_power=2.0)
-
-# More extreme weighting
-extreme_conf_nms = ConfidenceWeightedNMS(confidence_power=3.0)
+conf_nms = create_strategy("confidence_weighted_nms", iou_threshold=0.5)
 ```
 
 **Confidence power effects**:
@@ -140,13 +135,10 @@ extreme_conf_nms = ConfidenceWeightedNMS(confidence_power=3.0)
 **When to use**: Balance between speed and multi-model validation.
 
 ```python
-from detection_fusion.strategies import AffirmativeNMS
+from detection_fusion.strategies import create_strategy
 
-# Require 2+ models per detection
-affirmative = AffirmativeNMS(iou_threshold=0.5, min_models=2)
-
-# Very conservative: require 3+ models
-strict_affirmative = AffirmativeNMS(iou_threshold=0.6, min_models=3)
+# Affirmative NMS with multi-model validation
+affirmative = create_strategy("affirmative_nms", iou_threshold=0.5)
 ```
 
 ### 3. Clustering Strategies
@@ -155,13 +147,10 @@ strict_affirmative = AffirmativeNMS(iou_threshold=0.6, min_models=3)
 **When to use**: Variable object sizes, spatial relationships matter.
 
 ```python
-from detection_fusion.strategies import DBSCANClustering
+from detection_fusion.strategies import create_strategy
 
-# Tight clusters for small objects
-tight_clustering = DBSCANClustering(eps=0.05, min_samples=2)
-
-# Loose clusters for large objects
-loose_clustering = DBSCANClustering(eps=0.15, min_samples=3)
+# DBSCAN clustering
+clustering = create_strategy("dbscan", iou_threshold=0.5)
 ```
 
 **Parameter selection**:
@@ -176,13 +165,10 @@ loose_clustering = DBSCANClustering(eps=0.15, min_samples=3)
 **When to use**: When IoU might not capture object relationships well.
 
 ```python
-from detection_fusion.strategies import CentroidClustering
+from detection_fusion.strategies import create_strategy
 
 # Cluster based on center distance
-centroid_cluster = CentroidClustering(
-    distance_threshold=0.1,  # Maximum center distance
-    min_cluster_size=2       # Minimum detections per cluster
-)
+centroid_cluster = create_strategy("centroid_clustering", iou_threshold=0.5)
 ```
 
 **Benefits**:
@@ -194,13 +180,10 @@ centroid_cluster = CentroidClustering(
 **When to use**: When spatial consistency within clusters matters.
 
 ```python
-from detection_fusion.strategies import DistanceWeightedVoting
+from detection_fusion.strategies import create_strategy
 
 # Weight by distance to cluster centroid
-distance_voter = DistanceWeightedVoting(
-    iou_threshold=0.5,
-    distance_weight=1.0  # Balance between distance and confidence
-)
+distance_voter = create_strategy("distance_weighted", iou_threshold=0.5)
 ```
 
 ### 4. Confidence-Based Strategies
@@ -209,34 +192,20 @@ distance_voter = DistanceWeightedVoting(
 **When to use**: When models have very different confidence calibration.
 
 ```python
-from detection_fusion.strategies import ConfidenceThresholdVoting
+from detection_fusion.strategies import create_strategy
 
-# Adaptive thresholds per model
-adaptive_conf = ConfidenceThresholdVoting(
-    iou_threshold=0.5,
-    base_confidence=0.5,
-    adaptive_threshold=True  # Use median confidence per model
-)
-
-# Fixed threshold for all models
-fixed_conf = ConfidenceThresholdVoting(
-    base_confidence=0.7,
-    adaptive_threshold=False
-)
+# Confidence threshold strategy
+adaptive_conf = create_strategy("confidence_threshold", iou_threshold=0.5)
 ```
 
 #### High Confidence First
 **When to use**: When you have a clear confidence hierarchy.
 
 ```python
-from detection_fusion.strategies import HighConfidenceFirst
+from detection_fusion.strategies import create_strategy
 
 # Hierarchical confidence processing
-hierarchical = HighConfidenceFirst(
-    iou_threshold=0.5,
-    high_conf_threshold=0.8,  # High confidence cutoff
-    low_conf_threshold=0.3    # Minimum confidence to consider
-)
+hierarchical = create_strategy("high_confidence_first", iou_threshold=0.5)
 ```
 
 ### 5. Adaptive Strategies
@@ -245,24 +214,20 @@ hierarchical = HighConfidenceFirst(
 **When to use**: Datasets with both small and large objects.
 
 ```python
-from detection_fusion.strategies import AdaptiveThresholdStrategy
+from detection_fusion.strategies import create_strategy
 
 # Different thresholds for different object sizes
-adaptive = AdaptiveThresholdStrategy(
-    small_threshold=0.3,  # Permissive for small objects
-    large_threshold=0.7,  # Strict for large objects
-    size_cutoff=0.05      # Area threshold (5% of image)
-)
+adaptive = create_strategy("adaptive_threshold", iou_threshold=0.5)
 ```
 
 #### Multi-Scale Strategy
 **When to use**: When objects span multiple scales (tiny to large).
 
 ```python
-from detection_fusion.strategies import MultiScaleStrategy
+from detection_fusion.strategies import create_strategy
 
 # Automatic scale-specific processing
-multi_scale = MultiScaleStrategy(iou_threshold=0.5)
+multi_scale = create_strategy("multi_scale", iou_threshold=0.5)
 
 # Scale categories and their thresholds:
 # - Tiny (<1% area): Very permissive
@@ -275,14 +240,10 @@ multi_scale = MultiScaleStrategy(iou_threshold=0.5)
 **When to use**: Scenes with varying object density.
 
 ```python
-from detection_fusion.strategies import DensityAdaptiveStrategy
+from detection_fusion.strategies import create_strategy
 
 # Adapt strategy based on spatial density
-density_adaptive = DensityAdaptiveStrategy(
-    iou_threshold=0.5,
-    grid_size=5,                    # 5x5 spatial grid
-    high_density_threshold=10       # 10+ detections = high density
-)
+density_adaptive = create_strategy("density_adaptive", iou_threshold=0.5)
 ```
 
 **Processing logic**:
@@ -293,13 +254,10 @@ density_adaptive = DensityAdaptiveStrategy(
 **When to use**: When model ranking information is available.
 
 ```python
-from detection_fusion.strategies import ConsensusRankingStrategy
+from detection_fusion.strategies import create_strategy
 
 # Combine ranking with confidence
-ranking_strategy = ConsensusRankingStrategy(
-    iou_threshold=0.5,
-    rank_weight=0.5  # Balance between rank and confidence
-)
+ranking_strategy = create_strategy("consensus_ranking", iou_threshold=0.5)
 ```
 
 ### 6. Probabilistic Strategies
@@ -308,35 +266,20 @@ ranking_strategy = ConsensusRankingStrategy(
 **When to use**: When you need smooth probability estimates.
 
 ```python
-from detection_fusion.strategies import SoftVoting
+from detection_fusion.strategies import create_strategy
 
-# Standard temperature
-soft_voter = SoftVoting(iou_threshold=0.5, temperature=1.0)
-
-# Sharpened probabilities (more decisive)
-sharp_voter = SoftVoting(temperature=0.5)
-
-# Smoothed probabilities (less decisive)  
-smooth_voter = SoftVoting(temperature=2.0)
+# Standard soft voting
+soft_voter = create_strategy("soft_voting", iou_threshold=0.5)
 ```
 
 #### Bayesian Fusion
 **When to use**: Class imbalance, principled uncertainty quantification.
 
 ```python
-from detection_fusion.strategies import BayesianFusion
+from detection_fusion.strategies import create_strategy
 
-# Automatic prior learning from data
-bayesian = BayesianFusion(iou_threshold=0.5)
-
-# Custom class priors based on dataset knowledge
-custom_priors = {
-    0: 0.4,  # person - most common
-    1: 0.3,  # car - common
-    2: 0.2,  # bike - less common
-    3: 0.1   # other - rare
-}
-bayesian_custom = BayesianFusion(class_priors=custom_priors)
+# Bayesian fusion
+bayesian = create_strategy("bayesian", iou_threshold=0.5)
 ```
 
 ## 🔧 Configuration Best Practices
@@ -548,7 +491,7 @@ def process_large_dataset(detections, strategy, batch_size=1000):
 ### Grid Search for Strategy Parameters
 ```python
 import itertools
-from detection_fusion.utils import load_yaml_config
+import yaml
 
 def grid_search_strategy(strategy_class, param_grid, test_data):
     """Grid search for optimal strategy parameters."""
@@ -799,4 +742,34 @@ def smart_strategy_selection(detections):
     return ensemble.run_strategy(selected_strategy)
 ```
 
-This comprehensive strategy guide provides everything needed to select, configure, and optimize ensemble strategies for any object detection scenario. The 17+ available strategies cover every use case from speed-critical applications to high-precision scientific work.
+This comprehensive strategy guide provides everything needed to select, configure, and optimize ensemble strategies for any object detection scenario. The 16 available strategies cover every use case from speed-critical applications to high-precision scientific work.
+
+## Available Strategies Quick Reference
+
+```bash
+# List all strategies
+detection-fusion list-strategies
+
+# List by category
+detection-fusion list-strategies --category voting
+detection-fusion list-strategies --category adaptive -v
+```
+
+| Strategy Name | Category | Description |
+|---------------|----------|-------------|
+| `majority_vote` | voting | Consensus-based merging |
+| `weighted_vote` | voting | Confidence-weighted voting |
+| `nms` | nms | Non-maximum suppression |
+| `affirmative_nms` | nms | NMS with multi-model validation |
+| `dbscan` | clustering | Density-based clustering |
+| `soft_voting` | probabilistic | Probabilistic fusion |
+| `bayesian` | probabilistic | Bayesian inference |
+| `distance_weighted` | distance_based | Spatial relationship weighting |
+| `centroid_clustering` | distance_based | Center-based clustering |
+| `confidence_threshold` | confidence_based | Adaptive confidence filtering |
+| `confidence_weighted_nms` | confidence_based | Confidence-weighted box regression |
+| `high_confidence_first` | confidence_based | Hierarchical confidence |
+| `adaptive_threshold` | adaptive | Size-aware thresholds |
+| `density_adaptive` | adaptive | Context-aware processing |
+| `multi_scale` | adaptive | Scale-specific processing |
+| `consensus_ranking` | adaptive | Model ranking fusion |

@@ -1,207 +1,185 @@
+"""
+Distance-based ensemble strategies.
+
+Strategies that use spatial distance for weighting and clustering.
+"""
+
+from typing import Dict, List
+
 import numpy as np
-from typing import List, Dict
-from collections import defaultdict, Counter
 from sklearn.metrics.pairwise import euclidean_distances
 
-from .base import BaseStrategy
 from ..core.detection import Detection
+from .base import BaseStrategy, StrategyMetadata
+from .mixins import BoxMergingMixin, ClassVotingMixin, ClusteringMixin
 
 
-class DistanceWeightedVoting(BaseStrategy):
-    """Voting strategy that weights by spatial distance between detections."""
-    
-    def __init__(self, iou_threshold: float = 0.5, distance_weight: float = 1.0):
-        super().__init__(iou_threshold)
+class DistanceWeightedVoting(BaseStrategy, ClusteringMixin, BoxMergingMixin, ClassVotingMixin):
+    """Voting strategy that weights by spatial distance between detections.
+
+    Detections closer to the cluster centroid receive higher weights,
+    combined with confidence weights for voting and box averaging.
+    """
+
+    metadata = StrategyMetadata(
+        name="distance_weighted",
+        category="distance_based",
+        description="Weights by spatial distance to cluster centroid",
+    )
+
+    def __init__(self, iou_threshold: float = 0.5, distance_weight: float = 1.0, **kwargs):
+        super().__init__(iou_threshold, **kwargs)
         self.distance_weight = distance_weight
-    
+
     @property
     def name(self) -> str:
         return "distance_weighted"
-    
+
     def merge(self, detections: Dict[str, List[Detection]], **kwargs) -> List[Detection]:
+        """Merge detections using distance-weighted voting.
+
+        Args:
+            detections: Dict mapping model names to detection lists
+            **kwargs: Override distance_weight with 'distance_weight' key
+
+        Returns:
+            List of merged detections with distance-weighted boxes
+        """
+        distance_weight = kwargs.get("distance_weight", self.distance_weight)
+
         # Flatten all detections
-        all_detections = []
-        for model_detections in detections.values():
-            all_detections.extend(model_detections)
-        
+        all_detections = self._flatten(detections)
         if not all_detections:
             return []
-        
-        # Cluster overlapping detections
-        clusters = self._cluster_detections(all_detections)
-        
+
+        # Cluster overlapping detections using mixin
+        clusters = self.cluster_detections(all_detections)
+
         # Apply distance-weighted voting
         merged_detections = []
         for cluster in clusters:
-            merged_det = self._distance_weighted_vote(cluster)
+            merged_det = self._distance_weighted_vote(cluster, distance_weight)
             merged_detections.append(merged_det)
-        
+
         return merged_detections
-    
-    def _cluster_detections(self, detections: List[Detection]) -> List[List[Detection]]:
-        """Group overlapping detections into clusters."""
-        from ..utils.metrics import calculate_iou
-        
-        clusters = []
-        used = set()
-        
-        for i, det1 in enumerate(detections):
-            if i in used:
-                continue
-                
-            cluster = [det1]
-            used.add(i)
-            
-            for j, det2 in enumerate(detections):
-                if j <= i or j in used:
-                    continue
-                    
-                iou = calculate_iou(det1.bbox, det2.bbox)
-                if iou >= self.iou_threshold:
-                    cluster.append(det2)
-                    used.add(j)
-            
-            clusters.append(cluster)
-        
-        return clusters
-    
-    def _distance_weighted_vote(self, cluster: List[Detection]) -> Detection:
+
+    def _distance_weighted_vote(
+        self, cluster: List[Detection], distance_weight: float
+    ) -> Detection:
         """Apply distance-weighted voting to a cluster."""
         if len(cluster) == 1:
             return cluster[0]
-        
+
         # Calculate centroid
         centers = np.array([[det.x, det.y] for det in cluster])
         centroid = np.mean(centers, axis=0)
-        
+
         # Calculate distance weights (closer to centroid = higher weight)
         distances = euclidean_distances(centers, centroid.reshape(1, -1)).flatten()
         max_distance = np.max(distances) if np.max(distances) > 0 else 1.0
         distance_weights = 1.0 - (distances / max_distance)
-        
+
         # Combine with confidence weights
         confidence_weights = np.array([det.confidence for det in cluster])
-        final_weights = (distance_weights * self.distance_weight + confidence_weights) / 2
+        final_weights = (distance_weights * distance_weight + confidence_weights) / 2
         final_weights = final_weights / final_weights.sum()
-        
-        # Vote on class
-        class_scores = defaultdict(float)
-        for det, weight in zip(cluster, final_weights):
-            class_scores[det.class_id] += weight
-        
-        voted_class = max(class_scores, key=class_scores.get)
-        
-        # Weighted average of properties
-        avg_x = np.average([det.x for det in cluster], weights=final_weights)
-        avg_y = np.average([det.y for det in cluster], weights=final_weights)
-        avg_w = np.average([det.w for det in cluster], weights=final_weights)
-        avg_h = np.average([det.h for det in cluster], weights=final_weights)
-        avg_conf = np.average([det.confidence for det in cluster], weights=final_weights)
-        
-        return Detection(
+
+        # Vote on class using mixin
+        voted_class = self.vote_weighted(cluster, final_weights.tolist())
+
+        # Use mixin for box merging
+        return self.merge_cluster(
+            cluster,
+            weights=final_weights.tolist(),
             class_id=voted_class,
-            x=avg_x,
-            y=avg_y,
-            w=avg_w,
-            h=avg_h,
-            confidence=avg_conf,
-            model_source=f"distance_weighted_{len(cluster)}"
+            source=f"distance_weighted_{len(cluster)}",
         )
 
 
-class CentroidClustering(BaseStrategy):
-    """Clustering strategy based on detection centroids."""
-    
-    def __init__(self, distance_threshold: float = 0.1, min_cluster_size: int = 2):
-        super().__init__(iou_threshold=0.5)  # Not used in this strategy
+class CentroidClustering(BaseStrategy, BoxMergingMixin, ClassVotingMixin):
+    """Clustering strategy based on detection centroids.
+
+    Uses agglomerative clustering on detection center points
+    to group nearby detections before merging.
+    """
+
+    metadata = StrategyMetadata(
+        name="centroid_clustering",
+        category="distance_based",
+        description="Agglomerative clustering based on detection centers",
+    )
+
+    def __init__(self, distance_threshold: float = 0.1, min_cluster_size: int = 2, **kwargs):
+        super().__init__(iou_threshold=0.5, **kwargs)  # IoU not used
         self.distance_threshold = distance_threshold
         self.min_cluster_size = min_cluster_size
-    
+
     @property
     def name(self) -> str:
         return "centroid_clustering"
-    
+
     def merge(self, detections: Dict[str, List[Detection]], **kwargs) -> List[Detection]:
+        """Merge detections using centroid-based clustering.
+
+        Args:
+            detections: Dict mapping model names to detection lists
+            **kwargs: Override distance_threshold/min_cluster_size
+
+        Returns:
+            List of merged detections, one per cluster
+        """
+        distance_threshold = kwargs.get("distance_threshold", self.distance_threshold)
+        min_cluster_size = kwargs.get("min_cluster_size", self.min_cluster_size)
+
         # Flatten all detections
-        all_detections = []
-        for model_detections in detections.values():
-            all_detections.extend(model_detections)
-        
+        all_detections = self._flatten(detections)
         if not all_detections:
             return []
-        
-        # Extract centers for clustering
-        centers = np.array([[det.x, det.y] for det in all_detections])
-        
-        # Simple agglomerative clustering based on distance
-        clusters = self._agglomerative_clustering(centers, all_detections)
-        
-        # Merge each cluster
+
+        # Agglomerative clustering based on distance
+        clusters = self._agglomerative_clustering(all_detections, distance_threshold)
+
+        # Merge each cluster using mixins
         merged_detections = []
         for cluster in clusters:
-            if len(cluster) >= self.min_cluster_size:
-                merged_det = self._merge_cluster(cluster)
+            if len(cluster) >= min_cluster_size:
+                voted_class = self.vote_majority(cluster)
+                merged_det = self.merge_cluster(
+                    cluster, class_id=voted_class, source=f"centroid_cluster_{len(cluster)}"
+                )
                 merged_detections.append(merged_det)
-        
+
         return merged_detections
-    
-    def _agglomerative_clustering(self, centers: np.ndarray, 
-                                detections: List[Detection]) -> List[List[Detection]]:
+
+    def _agglomerative_clustering(
+        self, detections: List[Detection], distance_threshold: float
+    ) -> List[List[Detection]]:
         """Simple agglomerative clustering based on centroid distance."""
         clusters = [[det] for det in detections]
-        
+
         while True:
             # Find closest pair of clusters
-            min_distance = float('inf')
+            min_distance = float("inf")
             merge_i, merge_j = -1, -1
-            
+
             for i in range(len(clusters)):
                 for j in range(i + 1, len(clusters)):
                     # Calculate centroid distance between clusters
-                    cluster_i_centers = np.array([[det.x, det.y] for det in clusters[i]])
-                    cluster_j_centers = np.array([[det.x, det.y] for det in clusters[j]])
-                    
-                    centroid_i = np.mean(cluster_i_centers, axis=0)
-                    centroid_j = np.mean(cluster_j_centers, axis=0)
-                    
+                    centroid_i = np.mean([[det.x, det.y] for det in clusters[i]], axis=0)
+                    centroid_j = np.mean([[det.x, det.y] for det in clusters[j]], axis=0)
+
                     distance = np.linalg.norm(centroid_i - centroid_j)
-                    
+
                     if distance < min_distance:
                         min_distance = distance
                         merge_i, merge_j = i, j
-            
+
             # Stop if minimum distance exceeds threshold
-            if min_distance > self.distance_threshold:
+            if min_distance > distance_threshold:
                 break
-            
+
             # Merge clusters
             clusters[merge_i].extend(clusters[merge_j])
             clusters.pop(merge_j)
-        
+
         return clusters
-    
-    def _merge_cluster(self, cluster: List[Detection]) -> Detection:
-        """Merge detections in a cluster."""
-        # Vote on class
-        class_votes = Counter([det.class_id for det in cluster])
-        voted_class = class_votes.most_common(1)[0][0]
-        
-        # Average properties weighted by confidence
-        weights = np.array([det.confidence for det in cluster])
-        weights = weights / weights.sum()
-        
-        avg_x = np.average([det.x for det in cluster], weights=weights)
-        avg_y = np.average([det.y for det in cluster], weights=weights)
-        avg_w = np.average([det.w for det in cluster], weights=weights)
-        avg_h = np.average([det.h for det in cluster], weights=weights)
-        avg_conf = np.average([det.confidence for det in cluster], weights=weights)
-        
-        return Detection(
-            class_id=voted_class,
-            x=avg_x,
-            y=avg_y,
-            w=avg_w,
-            h=avg_h,
-            confidence=avg_conf,
-            model_source=f"centroid_cluster_{len(cluster)}"
-        )

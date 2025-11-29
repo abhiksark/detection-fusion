@@ -5,12 +5,12 @@ Thank you for your interest in contributing to the DetectionFusion package! This
 ## 🤝 Ways to Contribute
 
 ### 1. Bug Reports
-- Report bugs through [GitHub Issues](https://github.com/yourusername/detection-fusion/issues)
+- Report bugs through [GitHub Issues](https://github.com/abhiksark/detection-fusion/issues)
 - Use the bug report template
 - Include system information and minimal reproduction code
 
 ### 2. Feature Requests
-- Suggest new features through [GitHub Discussions](https://github.com/yourusername/detection-fusion/discussions)
+- Suggest new features through [GitHub Discussions](https://github.com/abhiksark/detection-fusion/discussions)
 - Explain the use case and expected behavior
 - Consider implementation complexity
 
@@ -24,6 +24,65 @@ Thank you for your interest in contributing to the DetectionFusion package! This
 - New ensemble strategies
 - Performance improvements
 - Test coverage improvements
+
+## 📋 v1.0 Architecture Notes
+
+Before contributing, familiarize yourself with the v1.0 architecture:
+
+### Detection Model (Pydantic)
+Detection is now an **immutable Pydantic model**. Use keyword arguments:
+```python
+from detection_fusion import Detection
+
+# Create detection with keyword args (required)
+det = Detection(
+    class_id=0, x=0.5, y=0.5, w=0.2, h=0.3,
+    confidence=0.95, model_source="yolov8n"
+)
+
+# Detection is frozen - use with_* methods to create modified copies
+det2 = det.with_confidence(0.8)
+det3 = det.with_source("yolov8s")
+```
+
+### Strategy Registry
+Use `create_strategy()` instead of instantiating strategy classes directly:
+```python
+from detection_fusion.strategies import create_strategy, StrategyRegistry
+
+# Create strategy by name
+strategy = create_strategy("weighted_vote", iou_threshold=0.5)
+
+# List available strategies
+print(StrategyRegistry.list_all())
+```
+
+### Pipeline API
+Use the fluent Pipeline API for chaining operations:
+```python
+from detection_fusion.pipeline import DetectionPipeline
+
+ctx = (
+    DetectionPipeline()
+    .load("labels/", format="yolo")
+    .ensemble("weighted_vote", iou_threshold=0.5)
+    .evaluate("GT/")
+    .run()
+)
+print(f"mAP: {ctx.evaluation_result.mAP:.3f}")
+```
+
+### Configuration (Pydantic)
+Use Pydantic config models with builder pattern:
+```python
+from detection_fusion.config import StrategyConfig
+
+config = (
+    StrategyConfig()
+    .with_overlap(threshold=0.6)
+    .with_voting(min_votes=3)
+)
+```
 
 ## 🚀 Getting Started
 
@@ -80,7 +139,7 @@ pytest
 pytest --cov=detection_fusion
 
 # Run specific test file
-pytest tests/test_strategies.py
+pytest tests/strategies/test_registry.py
 ```
 
 4. **Format and Lint**
@@ -189,31 +248,37 @@ def process_results(results: Optional[Dict[str, List[Detection]]],
 1. **Test Structure**
 ```python
 import pytest
-from detection_fusion.strategies import MajorityVoting
-from detection_fusion.core.detection import Detection
+from detection_fusion.strategies import create_strategy
+from detection_fusion import Detection
 
 class TestMajorityVoting:
     """Test cases for MajorityVoting strategy."""
-    
+
     def setup_method(self):
         """Set up test fixtures."""
-        self.strategy = MajorityVoting(iou_threshold=0.5, min_votes=2)
+        self.strategy = create_strategy("majority_vote", iou_threshold=0.5)
         self.sample_detections = {
-            "model1": [Detection(0, 0.5, 0.5, 0.2, 0.3, 0.8, "model1")],
-            "model2": [Detection(0, 0.52, 0.48, 0.18, 0.32, 0.85, "model2")]
+            "model1": [Detection(
+                class_id=0, x=0.5, y=0.5, w=0.2, h=0.3,
+                confidence=0.8, model_source="model1"
+            )],
+            "model2": [Detection(
+                class_id=0, x=0.52, y=0.48, w=0.18, h=0.32,
+                confidence=0.85, model_source="model2"
+            )]
         }
-    
+
     def test_merge_basic(self):
         """Test basic merging functionality."""
         results = self.strategy.merge(self.sample_detections)
         assert len(results) == 1
         assert results[0].class_id == 0
-    
+
     def test_merge_empty_input(self):
         """Test handling of empty input."""
         results = self.strategy.merge({})
         assert len(results) == 0
-    
+
     @pytest.mark.parametrize("iou_threshold,expected_count", [
         (0.3, 1),
         (0.7, 0),
@@ -221,7 +286,7 @@ class TestMajorityVoting:
     ])
     def test_iou_threshold_sensitivity(self, iou_threshold, expected_count):
         """Test sensitivity to IoU threshold."""
-        strategy = MajorityVoting(iou_threshold=iou_threshold, min_votes=2)
+        strategy = create_strategy("majority_vote", iou_threshold=iou_threshold)
         results = strategy.merge(self.sample_detections)
         assert len(results) == expected_count
 ```
@@ -239,12 +304,16 @@ def sample_detections():
     """Provide realistic detection data for testing."""
     return {
         "yolov8n": [
-            Detection(0, 0.5, 0.3, 0.2, 0.4, 0.85, "yolov8n"),
-            Detection(1, 0.7, 0.6, 0.1, 0.3, 0.92, "yolov8n")
+            Detection(class_id=0, x=0.5, y=0.3, w=0.2, h=0.4,
+                      confidence=0.85, model_source="yolov8n"),
+            Detection(class_id=1, x=0.7, y=0.6, w=0.1, h=0.3,
+                      confidence=0.92, model_source="yolov8n")
         ],
         "yolov8s": [
-            Detection(0, 0.52, 0.28, 0.18, 0.42, 0.88, "yolov8s"),
-            Detection(2, 0.3, 0.7, 0.15, 0.25, 0.78, "yolov8s")
+            Detection(class_id=0, x=0.52, y=0.28, w=0.18, h=0.42,
+                      confidence=0.88, model_source="yolov8s"),
+            Detection(class_id=2, x=0.3, y=0.7, w=0.15, h=0.25,
+                      confidence=0.78, model_source="yolov8s")
         ]
     }
 ```
@@ -259,10 +328,10 @@ pytest
 pytest --cov=detection_fusion --cov-report=html
 
 # Run specific test file
-pytest tests/test_strategies.py
+pytest tests/strategies/test_registry.py
 
 # Run specific test
-pytest tests/test_strategies.py::TestMajorityVoting::test_merge_basic
+pytest tests/strategies/test_voting.py::TestMajorityVoting::test_merge_basic
 
 # Run tests with verbose output
 pytest -v
@@ -273,80 +342,90 @@ pytest -n auto
 
 ## 🎯 Adding New Ensemble Strategies
 
-### Strategy Implementation
+### Strategy Implementation (v1.0 Pattern)
 
-1. **Create Strategy Class**
+1. **Create Strategy Class with Registry Decorator**
 ```python
-from detection_fusion.strategies.base import BaseStrategy
-from detection_fusion.core.detection import Detection
+from detection_fusion.strategies.base import BaseStrategy, StrategyMetadata
+from detection_fusion.strategies.registry import StrategyRegistry
+from detection_fusion import Detection
 from typing import List, Dict
 
+@StrategyRegistry.register("my_custom_strategy")
 class MyCustomStrategy(BaseStrategy):
     """Custom ensemble strategy implementation."""
-    
-    def __init__(self, iou_threshold: float = 0.5, custom_param: float = 1.0):
-        super().__init__(iou_threshold)
+
+    # Required: Strategy metadata for registry
+    metadata = StrategyMetadata(
+        name="my_custom_strategy",
+        category="custom",  # voting, nms, clustering, etc.
+        description="My custom ensemble strategy"
+    )
+
+    def __init__(self, iou_threshold: float = 0.5, custom_param: float = 1.0, **kwargs):
+        super().__init__(iou_threshold=iou_threshold, **kwargs)
         self.custom_param = custom_param
-    
+
     @property
     def name(self) -> str:
         return "my_custom_strategy"
-    
+
     def merge(self, detections: Dict[str, List[Detection]], **kwargs) -> List[Detection]:
         """Implement your custom merging logic."""
-        # Your implementation here
         merged_detections = []
-        
+
         # Example: Simple implementation
         all_detections = []
         for model_detections in detections.values():
             all_detections.extend(model_detections)
-        
+
         # Apply your custom logic
         # ...
-        
+
         return merged_detections
 ```
 
 2. **Add Tests**
 ```python
+from detection_fusion.strategies import create_strategy
+
 class TestMyCustomStrategy:
     """Test cases for MyCustomStrategy."""
-    
+
     def setup_method(self):
-        self.strategy = MyCustomStrategy(custom_param=2.0)
-    
+        self.strategy = create_strategy("my_custom_strategy", custom_param=2.0)
+
     def test_custom_logic(self):
         """Test custom strategy logic."""
         # Your tests here
         pass
 ```
 
-3. **Update Imports**
+3. **Update Module Imports**
 ```python
 # In detection_fusion/strategies/__init__.py
-from .my_module import MyCustomStrategy
+# The @StrategyRegistry.register decorator auto-registers the strategy,
+# but you still need to import the module to trigger registration:
+from . import my_module  # This triggers the decorator
 
-__all__ = [
-    # ... existing strategies
-    "MyCustomStrategy"
-]
+# Export for direct class access if needed
+from .my_module import MyCustomStrategy
 ```
 
 4. **Add Documentation**
 ```python
 def merge(self, detections: Dict[str, List[Detection]], **kwargs) -> List[Detection]:
     """Merge detections using custom algorithm.
-    
+
     This strategy implements [describe your approach].
-    
+
     Args:
         detections: Dictionary mapping model names to their detections
         **kwargs: Additional parameters
-        
+
     Returns:
         List of merged detections
-        
+
     Note:
         This strategy works best when [describe use case].
     """
@@ -411,15 +490,15 @@ What actually happened.
 **Code to Reproduce**
 ```python
 # Minimal code example
-from detection_fusion import EnsembleVoting
+from detection_fusion import merge_detections, Detection
 # ... rest of code
 ```
 
 **Environment**
 - OS: [e.g. Ubuntu 20.04]
 - Python version: [e.g. 3.9.7]
-- Package version: [e.g. 0.1.0]
-- PyTorch version: [e.g. 1.12.0]
+- Package version: [e.g. 1.0.0]
+- PyTorch version: [e.g. 1.12.0] (optional)
 
 **Additional Context**
 Any other context about the problem.
@@ -469,7 +548,7 @@ If you have questions about development:
 
 1. **Version Bump**
 ```bash
-# Update version in setup.py and __init__.py
+# Update version in detection_fusion/_version.py
 # Update CHANGELOG.md with new version
 ```
 
@@ -485,8 +564,8 @@ pip install -e .
 3. **Release**
 ```bash
 # Create release tag
-git tag v0.1.0
-git push origin v0.1.0
+git tag v1.0.0
+git push origin v1.0.0
 
 # Create GitHub release with changelog
 ```

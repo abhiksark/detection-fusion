@@ -5,13 +5,67 @@ All notable changes to the DetectionFusion package will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+**Author:** Abhik Sarkar
+
+## [1.0.0] - 2025-11-29
+
+### Major Architecture Overhaul
+
+This release represents a complete architectural redesign of DetectionFusion.
+
+#### Core Changes
+- **Pydantic v2 Models**: Detection and config classes are now immutable Pydantic models
+- **Pipeline API**: New fluent interface for chaining load -> ensemble -> evaluate operations
+- **Format Registry**: Extensible format system with auto-detection (YOLO, VOC XML, COCO)
+- **Strategy Registry**: Enhanced with metadata, categories, and parameter schemas
+- **Modern CLI**: Click-based CLI with Rich output (`detection-fusion` / `dfusion`)
+
+#### New Features
+- **DetectionSet**: Rich aggregate class for filtering, grouping, and statistics
+- **ParamSchema**: Runtime parameter validation for strategies
+- **Format Conversion**: CLI command for converting between annotation formats
+- **GT Rectification CLI**: Integrated into main CLI as `detection-fusion rectify`
+- **Builder Pattern Config**: `StrategyConfig().with_overlap().with_voting()`
+- **RectificationConfig**: Pydantic model for GT rectification configuration
+  - `RectificationPathsConfig`: paths (labels_dir, gt_dir, images_dir, output_dir)
+  - `RectificationThresholdsConfig`: thresholds (iou, confidence, min_agreement)
+  - `RectificationOutputConfig`: output (most_correct, most_incorrect, copy_images)
+  - Builder pattern methods: `with_paths()`, `with_thresholds()`, `with_output()`
+- **ConfigLoader.load_rectification()**: Load RectificationConfig from YAML
+- **CLI --config option**: `detection-fusion rectify --config <path>` loads config from YAML
+
+#### New Modules
+- `detection_fusion.pipeline` - Pipeline API
+- `detection_fusion.config` - Pydantic configuration models
+- `detection_fusion.data.formats` - Format reader/writer system
+- `detection_fusion.exceptions` - Custom exception hierarchy
+
+#### Configuration
+- **Ensemble configs**: 5 configs matching `StrategyConfig` Pydantic model
+  - `default.yaml`, `high_precision.yaml`, `high_recall.yaml`, `small_objects.yaml`, `advanced.yaml`
+- **Rectification configs**: 4 configs matching `RectificationConfig` model
+  - `conservative.yaml`, `aggressive.yaml`, `balanced.yaml`, `custom.yaml`
+- **Strict validation**: YAML configs must match Pydantic models exactly
+
+#### Breaking Changes
+- Detection is now a frozen Pydantic model (use `with_*` methods for copies)
+- Config uses Pydantic models instead of dataclasses
+- CLI commands changed from `merge.py` to `detection-fusion merge`
+- Minimum Python version is now 3.8
+
+#### Test Coverage
+- 170 tests covering core, config, data, pipeline, and strategies modules
+- Tests mirror source structure for maintainability
+
+---
+
 ## [Unreleased]
 
 ### Planned Features
-- COCO format input/output support
 - Model confidence calibration
 - Uncertainty quantification
 - Web-based visualization dashboard
+- Additional format support (TFRecord, Pascal VOC detection)
 
 ## [0.2.1] - 2025-07-30
 

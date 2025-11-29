@@ -1,0 +1,20 @@
+# DetectionFusion GT Rectification - Aggressive Mode
+# Maximum error coverage for initial dataset audit
+
+mode: "maximize_error"
+
+paths:
+  labels_dir: "labels"
+  gt_dir: "GT"
+  images_dir: "images"
+  output_dir: "rectified_aggressive"
+
+thresholds:
+  iou: 0.4
+  confidence: 0.3
+  min_agreement: 2
+
+output:
+  most_correct: 100
+  most_incorrect: 100
+  copy_images: true

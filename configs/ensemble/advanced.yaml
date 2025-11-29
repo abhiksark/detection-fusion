@@ -1,0 +1,32 @@
+# DetectionFusion Advanced Ensemble Configuration
+# Complete reference showing all available parameters
+
+# Overlap configuration for box matching
+overlap:
+  threshold: 0.5          # IoU threshold for considering boxes as matching (0.0-1.0)
+  method: "iou"           # Overlap calculation method: "iou", "giou", "diou"
+
+# Voting configuration for consensus strategies
+voting:
+  min_votes: 2            # Minimum number of models that must agree (>=1)
+  use_weights: true       # Whether to use model weights in voting decisions
+
+# Confidence configuration for filtering and soft voting
+confidence:
+  min_threshold: 0.1      # Minimum confidence to consider a detection (0.0-1.0)
+  temperature: 1.0        # Temperature for softmax in soft voting (>0, lower = sharper)
+
+# Extra parameters for specific strategies
+extra:
+  # DBSCAN clustering parameters
+  dbscan_eps: 0.1         # Maximum distance between samples in a cluster
+  dbscan_min_samples: 2   # Minimum samples to form a cluster
+
+  # NMS parameters
+  nms_score_threshold: 0.1
+
+  # Bayesian fusion parameters
+  bayesian_prior: 0.5
+
+  # Distance-weighted voting parameters
+  distance_sigma: 0.1

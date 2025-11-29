@@ -1,0 +1,20 @@
+# DetectionFusion GT Rectification - Balanced Mode
+# Balanced approach for routine quality checks
+
+mode: "minimize_error"
+
+paths:
+  labels_dir: "labels"
+  gt_dir: "GT"
+  images_dir: "images"
+  output_dir: "rectified_balanced"
+
+thresholds:
+  iou: 0.5
+  confidence: 0.5
+  min_agreement: 3
+
+output:
+  most_correct: 50
+  most_incorrect: 50
+  copy_images: true

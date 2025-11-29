@@ -1,5 +1,7 @@
 from .detection import Detection
-from .ensemble import EnsembleVoting, AdvancedEnsemble
-from .analyzer import MultiModelAnalyzer
+from .detection_set import DetectionSet
 
-__all__ = ["Detection", "EnsembleVoting", "AdvancedEnsemble", "MultiModelAnalyzer"]
+__all__ = [
+    "Detection",
+    "DetectionSet",
+]

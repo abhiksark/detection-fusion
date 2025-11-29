@@ -3,7 +3,10 @@
 numpy>=1.19.0
 pandas>=1.1.0
 
-# Deep learning framework
+# Pydantic for data validation (required for v1.0)
+pydantic>=2.0.0
+
+# Deep learning framework (optional - for torch-based operations)
 torch>=1.7.0
 torchvision>=0.8.0
 
@@ -22,3 +25,7 @@ PyYAML>=5.4.0
 
 # Progress bars
 tqdm>=4.60.0
+
+# CLI dependencies (for detection-fusion command)
+click>=8.0.0
+rich>=12.0.0

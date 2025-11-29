@@ -1,0 +1,18 @@
+# DetectionFusion Small Objects Ensemble Configuration
+# Optimized for small object detection with lower IoU thresholds
+
+overlap:
+  threshold: 0.3
+  method: "iou"
+
+voting:
+  min_votes: 2
+  use_weights: true
+
+confidence:
+  min_threshold: 0.1
+  temperature: 1.0
+
+extra:
+  dbscan_eps: 0.05
+  dbscan_min_samples: 2

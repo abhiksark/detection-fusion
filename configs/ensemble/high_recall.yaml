@@ -1,0 +1,16 @@
+# DetectionFusion High-Recall Ensemble Configuration
+# Permissive settings for maximum detection coverage
+
+overlap:
+  threshold: 0.4
+  method: "iou"
+
+voting:
+  min_votes: 1
+  use_weights: true
+
+confidence:
+  min_threshold: 0.05
+  temperature: 1.5
+
+extra: {}
