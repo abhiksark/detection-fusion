@@ -466,10 +466,10 @@ my_results/
 my_analysis/
 my_rectified_dataset/
 
-# Temporary experiment files
-experiment_*.py
-test_*.py
-debug_*.py
+# Temporary experiment files (root level only)
+/experiment_*.py
+/test_*.py
+/debug_*.py
 
 # Custom scripts (users might create these for specific workflows)
 custom_*.py
