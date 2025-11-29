@@ -1,7 +1,6 @@
 """Tests for format registry."""
 
 import pytest
-from pathlib import Path
 
 from detection_fusion.data.formats import FormatRegistry
 from detection_fusion.data.formats.base import AnnotationReader, AnnotationWriter
@@ -64,7 +63,6 @@ class TestFormatRegistryDecorator:
 
     def test_register_reader_decorator(self):
         """Test reader registration via decorator."""
-        initial_readers = FormatRegistry.list_formats()["readers"].copy()
 
         @FormatRegistry.register_reader("test_format_reader")
         class TestReader(AnnotationReader):

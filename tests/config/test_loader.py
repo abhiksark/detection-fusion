@@ -1,12 +1,13 @@
 """Tests for ConfigLoader."""
 
-import pytest
 from pathlib import Path
+
+import pytest
 
 from detection_fusion.config import (
     ConfigLoader,
-    StrategyConfig,
     RectificationConfig,
+    StrategyConfig,
 )
 
 
@@ -70,10 +71,7 @@ overlap:
 
     def test_from_dict(self):
         """Test creating config from dict."""
-        data = {
-            "overlap": {"threshold": 0.6},
-            "voting": {"min_votes": 4}
-        }
+        data = {"overlap": {"threshold": 0.6}, "voting": {"min_votes": 4}}
 
         config = ConfigLoader.from_dict(data)
 
@@ -151,10 +149,7 @@ thresholds:
 
     def test_rectification_from_dict(self):
         """Test creating RectificationConfig from dict."""
-        data = {
-            "mode": "maximize_error",
-            "thresholds": {"iou": 0.4}
-        }
+        data = {"mode": "maximize_error", "thresholds": {"iou": 0.4}}
 
         config = ConfigLoader.rectification_from_dict(data)
 

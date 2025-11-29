@@ -3,11 +3,11 @@
 import pytest
 
 from detection_fusion.strategies.params import (
-    ParamSpec,
-    ParamSchema,
-    VOTING_SCHEMA,
-    NMS_SCHEMA,
     CLUSTERING_SCHEMA,
+    NMS_SCHEMA,
+    VOTING_SCHEMA,
+    ParamSchema,
+    ParamSpec,
     get_schema_for_category,
 )
 

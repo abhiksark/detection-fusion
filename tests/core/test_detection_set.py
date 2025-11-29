@@ -1,7 +1,5 @@
 """Tests for DetectionSet class."""
 
-import pytest
-
 from detection_fusion import Detection, DetectionSet
 
 
@@ -147,9 +145,5 @@ class TestDetectionSet:
 
     def test_chained_filtering(self, detection_set):
         """Test chaining filter operations."""
-        result = (
-            detection_set
-            .filter_by_class([0])
-            .filter_by_confidence(0.88)
-        )
+        result = detection_set.filter_by_class([0]).filter_by_confidence(0.88)
         assert result.total_count == 2

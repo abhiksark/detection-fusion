@@ -1,10 +1,6 @@
 """Tests for data loader module."""
 
-import pytest
-from pathlib import Path
-from unittest.mock import Mock, patch
-
-from detection_fusion import Detection, DetectionSet
+from detection_fusion import DetectionSet
 from detection_fusion.data.loader import FileDetectionLoader, load_detections
 
 

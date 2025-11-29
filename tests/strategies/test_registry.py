@@ -2,12 +2,12 @@
 
 import pytest
 
+from detection_fusion.strategies.base import BaseStrategy
 from detection_fusion.strategies.registry import (
     StrategyRegistry,
     create_strategy,
     list_strategies,
 )
-from detection_fusion.strategies.base import BaseStrategy
 
 
 class TestStrategyRegistry:

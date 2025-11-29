@@ -1,7 +1,6 @@
 """Tests for YOLO format reader/writer."""
 
 import pytest
-from pathlib import Path
 
 from detection_fusion import Detection
 from detection_fusion.data.formats.yolo import YOLOReader, YOLOWriter

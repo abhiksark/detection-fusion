@@ -1,8 +1,6 @@
 """Tests for detection pipeline."""
 
-import pytest
-
-from detection_fusion import Detection, DetectionSet
+from detection_fusion import DetectionSet
 from detection_fusion.config import StrategyConfig
 from detection_fusion.pipeline import DetectionPipeline
 from detection_fusion.pipeline.context import PipelineContext
@@ -105,12 +103,7 @@ class TestPipelineIntegration:
         """Test chained load and ensemble stages."""
         pipeline = DetectionPipeline()
 
-        ctx = (
-            pipeline
-            .load(str(yolo_labels_dir), format="yolo")
-            .ensemble("weighted_vote")
-            .run()
-        )
+        ctx = pipeline.load(str(yolo_labels_dir), format="yolo").ensemble("weighted_vote").run()
 
         assert ctx.detections is not None
         assert ctx.ensemble_result is not None

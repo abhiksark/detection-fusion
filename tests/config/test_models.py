@@ -4,14 +4,14 @@ import pytest
 from pydantic import ValidationError
 
 from detection_fusion.config import (
-    OverlapConfig,
-    VotingConfig,
     ConfidenceConfig,
-    StrategyConfig,
+    OverlapConfig,
     RectificationConfig,
+    RectificationOutputConfig,
     RectificationPathsConfig,
     RectificationThresholdsConfig,
-    RectificationOutputConfig,
+    StrategyConfig,
+    VotingConfig,
 )
 
 
@@ -148,10 +148,7 @@ class TestRectificationPathsConfig:
     def test_custom_values(self):
         """Test custom values."""
         config = RectificationPathsConfig(
-            labels_dir="my_labels",
-            gt_dir="my_gt",
-            images_dir="my_images",
-            output_dir="my_output"
+            labels_dir="my_labels", gt_dir="my_gt", images_dir="my_images", output_dir="my_output"
         )
         assert config.labels_dir == "my_labels"
         assert config.gt_dir == "my_gt"
@@ -171,11 +168,7 @@ class TestRectificationThresholdsConfig:
 
     def test_custom_values(self):
         """Test custom values."""
-        config = RectificationThresholdsConfig(
-            iou=0.6,
-            confidence=0.7,
-            min_agreement=4
-        )
+        config = RectificationThresholdsConfig(iou=0.6, confidence=0.7, min_agreement=4)
         assert config.iou == 0.6
         assert config.confidence == 0.7
         assert config.min_agreement == 4
@@ -212,11 +205,7 @@ class TestRectificationOutputConfig:
 
     def test_custom_values(self):
         """Test custom values."""
-        config = RectificationOutputConfig(
-            most_correct=100,
-            most_incorrect=200,
-            copy_images=False
-        )
+        config = RectificationOutputConfig(most_correct=100, most_incorrect=200, copy_images=False)
         assert config.most_correct == 100
         assert config.most_incorrect == 200
         assert config.copy_images is False
@@ -285,14 +274,8 @@ class TestRectificationConfig:
         """Test creating config from dict."""
         data = {
             "mode": "maximize_error",
-            "paths": {
-                "labels_dir": "custom_labels",
-                "gt_dir": "custom_gt"
-            },
-            "thresholds": {
-                "iou": 0.4,
-                "confidence": 0.3
-            }
+            "paths": {"labels_dir": "custom_labels", "gt_dir": "custom_gt"},
+            "thresholds": {"iou": 0.4, "confidence": 0.3},
         }
         config = RectificationConfig.model_validate(data)
 

@@ -1,9 +1,7 @@
 """Tests for pipeline context."""
 
-import pytest
-
 from detection_fusion import Detection, DetectionSet
-from detection_fusion.pipeline.context import PipelineContext, EvaluationResult
+from detection_fusion.pipeline.context import EvaluationResult, PipelineContext
 
 
 class TestEvaluationResult:
