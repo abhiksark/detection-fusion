@@ -16,17 +16,14 @@ class AnnotationReader(ABC):
         self,
         path: Path,
         image_size: Optional[Tuple[int, int]] = None,
-    ) -> List[Detection]:
-        ...
+    ) -> List[Detection]: ...
 
     @abstractmethod
-    def read_directory(self, dir_path: Path) -> Dict[str, List[Detection]]:
-        ...
+    def read_directory(self, dir_path: Path) -> Dict[str, List[Detection]]: ...
 
     @classmethod
     @abstractmethod
-    def can_read(cls, path: Path) -> bool:
-        ...
+    def can_read(cls, path: Path) -> bool: ...
 
 
 class AnnotationWriter(ABC):
@@ -41,13 +38,11 @@ class AnnotationWriter(ABC):
         detections: List[Detection],
         path: Path,
         image_size: Optional[Tuple[int, int]] = None,
-    ) -> None:
-        ...
+    ) -> None: ...
 
     @abstractmethod
     def write_directory(
         self,
         detections: Dict[str, List[Detection]],
         dir_path: Path,
-    ) -> None:
-        ...
+    ) -> None: ...

@@ -18,6 +18,7 @@ class FormatRegistry:
             reg_name = name or reader_class.format_name
             cls._readers[reg_name] = reader_class
             return reader_class
+
         return decorator
 
     @classmethod
@@ -26,24 +27,21 @@ class FormatRegistry:
             reg_name = name or writer_class.format_name
             cls._writers[reg_name] = writer_class
             return writer_class
+
         return decorator
 
     @classmethod
     def get_reader(cls, format_name: str) -> AnnotationReader:
         if format_name not in cls._readers:
             available = ", ".join(cls._readers.keys())
-            raise FormatError(
-                f"Unknown format: {format_name}. Available: {available}"
-            )
+            raise FormatError(f"Unknown format: {format_name}. Available: {available}")
         return cls._readers[format_name]()
 
     @classmethod
     def get_writer(cls, format_name: str) -> AnnotationWriter:
         if format_name not in cls._writers:
             available = ", ".join(cls._writers.keys())
-            raise FormatError(
-                f"Unknown format: {format_name}. Available: {available}"
-            )
+            raise FormatError(f"Unknown format: {format_name}. Available: {available}")
         return cls._writers[format_name]()
 
     @classmethod

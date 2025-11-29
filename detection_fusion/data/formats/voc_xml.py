@@ -50,9 +50,7 @@ class VOCXMLReader(AnnotationReader):
         elif image_size:
             width, height = image_size
         else:
-            raise FormatError(
-                f"Image size not found in {path} and not provided"
-            )
+            raise FormatError(f"Image size not found in {path} and not provided")
 
         if width <= 0 or height <= 0:
             raise FormatError(f"Invalid image size in {path}: {width}x{height}")

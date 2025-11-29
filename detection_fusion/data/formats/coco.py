@@ -158,17 +158,17 @@ class COCOWriter(AnnotationWriter):
         for img_id, (image_name, dets) in enumerate(by_image.items(), start=1):
             size = self._image_sizes.get(image_name, image_size)
             if not size:
-                raise FormatError(
-                    f"Image size required for {image_name} in COCO format"
-                )
+                raise FormatError(f"Image size required for {image_name} in COCO format")
 
             width, height = size
-            images.append({
-                "id": img_id,
-                "file_name": f"{image_name}.jpg",
-                "width": width,
-                "height": height,
-            })
+            images.append(
+                {
+                    "id": img_id,
+                    "file_name": f"{image_name}.jpg",
+                    "width": width,
+                    "height": height,
+                }
+            )
 
             for det in dets:
                 categories_seen.add(det.class_id)
@@ -179,15 +179,17 @@ class COCOWriter(AnnotationWriter):
                 abs_x = (det.x * width) - (abs_w / 2)
                 abs_y = (det.y * height) - (abs_h / 2)
 
-                annotations.append({
-                    "id": ann_id,
-                    "image_id": img_id,
-                    "category_id": det.class_id,
-                    "bbox": [abs_x, abs_y, abs_w, abs_h],
-                    "area": abs_w * abs_h,
-                    "iscrowd": 0,
-                    "score": det.confidence,
-                })
+                annotations.append(
+                    {
+                        "id": ann_id,
+                        "image_id": img_id,
+                        "category_id": det.class_id,
+                        "bbox": [abs_x, abs_y, abs_w, abs_h],
+                        "area": abs_w * abs_h,
+                        "iscrowd": 0,
+                        "score": det.confidence,
+                    }
+                )
                 ann_id += 1
 
         categories = []

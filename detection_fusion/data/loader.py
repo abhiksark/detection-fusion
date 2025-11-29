@@ -7,7 +7,6 @@ from detection_fusion.core.detection_set import DetectionSet
 from .formats import FormatRegistry
 from .formats.base import AnnotationReader
 
-
 DEFAULT_EXCLUDED_DIRS = {"unified", "GT", "__pycache__", ".git"}
 
 

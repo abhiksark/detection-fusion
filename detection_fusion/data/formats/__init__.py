@@ -1,9 +1,6 @@
-from .registry import FormatRegistry
+from . import coco, voc_xml, yolo
 from .base import AnnotationReader, AnnotationWriter
-
-from . import yolo
-from . import voc_xml
-from . import coco
+from .registry import FormatRegistry
 
 __all__ = [
     "FormatRegistry",
