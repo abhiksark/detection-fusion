@@ -11,7 +11,7 @@
 <p align="center">
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.8+-blue.svg" alt="Python 3.8+"></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
-  <a href="https://github.com/abhiksark/detection-fusion"><img src="https://img.shields.io/badge/version-1.0.0-green.svg" alt="Version"></a>
+  <a href="https://github.com/abhiksark/detection-fusion"><img src="https://img.shields.io/badge/version-1.1.0-green.svg" alt="Version"></a>
 </p>
 
 **DetectionFusion** is a Python toolkit for fusing multiple object detection results with ground truth validation and error analysis.
