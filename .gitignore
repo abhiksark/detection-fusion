@@ -260,14 +260,14 @@ $RECYCLE.BIN/
 # Data and Output Files
 # ================================
 
-# Dataset directories
-data/
-datasets/
-labels/
-images/
-annotations/
-ground_truth/
-gt/
+# Dataset directories (root level only, not package subdirs)
+/data/
+/datasets/
+/labels/
+/images/
+/annotations/
+/ground_truth/
+/gt/
 
 # Object detection specific files
 detections.txt
