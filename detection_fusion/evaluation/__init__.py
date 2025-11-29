@@ -6,22 +6,19 @@ models and their ensemble combinations, including ground truth comparison,
 standard metrics calculation, and detailed error analysis.
 
 Key Components:
-- EvaluationMetrics: Standard object detection metrics (AP, mAP, precision, recall)  
+- EvaluationMetrics: Standard object detection metrics (AP, mAP, precision, recall)
 - ErrorAnalyzer: Detailed error classification and analysis
 - Evaluator: Main orchestrator for evaluation workflows
-- Optimization: Strategy optimization using ground truth feedback
 """
 
-from .metrics import EvaluationMetrics, APCalculator
 from .error_analysis import ErrorAnalyzer, ErrorClassifier
 from .evaluator import Evaluator
-from .optimization import StrategyOptimizer
+from .metrics import APCalculator, EvaluationMetrics
 
 __all__ = [
-    'EvaluationMetrics',
-    'APCalculator', 
-    'ErrorAnalyzer',
-    'ErrorClassifier',
-    'Evaluator',
-    'StrategyOptimizer'
+    "EvaluationMetrics",
+    "APCalculator",
+    "ErrorAnalyzer",
+    "ErrorClassifier",
+    "Evaluator",
 ]

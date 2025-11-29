@@ -1,6 +1,8 @@
 # Troubleshooting Guide
 
-Common issues and solutions for the DetectionFusion package.
+Common issues and solutions for the DetectionFusion package v1.0.
+
+**Author:** Abhik Sarkar
 
 ## 🚨 Quick Diagnostics
 
@@ -18,29 +20,44 @@ def system_check():
     print(f"Working directory: {os.getcwd()}")
     
     # Check core dependencies
-    dependencies = [
-        'numpy', 'pandas', 'torch', 'torchvision', 
-        'sklearn', 'matplotlib', 'seaborn'
-    ]
-    
-    for dep in dependencies:
+    # Core dependencies (required)
+    core_deps = ['numpy', 'pandas', 'pydantic', 'sklearn', 'yaml', 'tqdm']
+
+    # Optional dependencies
+    optional_deps = ['torch', 'torchvision', 'matplotlib', 'seaborn', 'click', 'rich']
+
+    print("\n--- Core Dependencies ---")
+    for dep in core_deps:
         try:
             module = __import__(dep)
             version = getattr(module, '__version__', 'unknown')
             print(f"✅ {dep}: {version}")
         except ImportError:
-            print(f"❌ {dep}: Not installed")
-    
+            print(f"❌ {dep}: Not installed (REQUIRED)")
+
+    print("\n--- Optional Dependencies ---")
+    for dep in optional_deps:
+        try:
+            module = __import__(dep)
+            version = getattr(module, '__version__', 'unknown')
+            print(f"✅ {dep}: {version}")
+        except ImportError:
+            print(f"⚠️  {dep}: Not installed (optional)")
+
     # Check DetectionFusion
+    print("\n--- DetectionFusion ---")
     try:
         import detection_fusion
         print(f"✅ detection_fusion: {detection_fusion.__version__}")
-        
-        # Test basic functionality
-        from detection_fusion import EnsembleVoting
-        ensemble = EnsembleVoting()
+
+        # Test basic functionality (v1.0 pattern)
+        from detection_fusion import Detection
+        from detection_fusion.strategies import create_strategy
+
+        det = Detection(class_id=0, x=0.5, y=0.5, w=0.2, h=0.3, confidence=0.9)
+        strategy = create_strategy("majority_vote", iou_threshold=0.5)
         print("✅ Basic import test passed")
-        
+
     except Exception as e:
         print(f"❌ detection_fusion: {e}")
 
@@ -128,8 +145,8 @@ mkdir -p labels/model1 labels/model2 labels/model3
 # 2. Check file permissions
 ls -la labels/model1/detections.txt
 
-# 3. Use absolute paths
-detection-fusion --labels-dir /full/path/to/labels
+# 3. Use absolute paths with CLI
+detection-fusion merge --input /full/path/to/labels --strategy weighted_vote --output unified/
 ```
 
 ### Issue: Empty or Malformed Detection Files
@@ -339,14 +356,13 @@ diagnose_empty_results()
 
 **Solutions**:
 ```python
+from detection_fusion.strategies import create_strategy
+
 # 1. Lower IoU threshold
-strategy = MajorityVoting(iou_threshold=0.3, min_votes=2)
+strategy = create_strategy("majority_vote", iou_threshold=0.3)
 
-# 2. Reduce minimum votes
-strategy = MajorityVoting(iou_threshold=0.5, min_votes=1)
-
-# 3. Use more permissive strategy
-results = ensemble.run_strategy("nms")  # Most permissive
+# 2. Use more permissive strategy
+strategy = create_strategy("nms", iou_threshold=0.3)  # Most permissive
 ```
 
 ### Issue: Too Many Detections

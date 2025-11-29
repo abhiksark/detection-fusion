@@ -1,0 +1,16 @@
+# DetectionFusion High-Precision Ensemble Configuration
+# Conservative settings for critical applications where false positives are costly
+
+overlap:
+  threshold: 0.6
+  method: "iou"
+
+voting:
+  min_votes: 3
+  use_weights: true
+
+confidence:
+  min_threshold: 0.5
+  temperature: 0.5
+
+extra: {}

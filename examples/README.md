@@ -1,52 +1,26 @@
 # DetectionFusion Examples
 
-This directory contains comprehensive examples demonstrating various use cases of the DetectionFusion package.
+This directory contains examples demonstrating the DetectionFusion v1.0 API.
 
-## 🚀 Available Examples
+**Author:** Abhik Sarkar
+
+## Available Examples
 
 ### 1. `basic_usage.py`
-**Basic ensemble voting and analysis**
-- Simple ensemble voting workflows
-- Multi-model analysis basics
-- Perfect for getting started
+**Core v1.0 API patterns**
+- `merge_detections()` convenience function
+- `Detection` class with keyword arguments
+- `StrategyRegistry` and `create_strategy()`
+- `DetectionPipeline` fluent interface
+- Format conversion
 
 ```bash
 python examples/basic_usage.py
 ```
 
-### 2. `advanced_usage.py`
-**Advanced ensemble techniques**
-- Custom strategy parameters
-- Advanced analysis features
-- Visualization generation
-
-```bash
-python examples/advanced_usage.py
-```
-
-### 3. `advanced_strategies_demo.py`
-**Complete strategy demonstration**
-- All 17+ ensemble strategies
-- Distance-based, confidence-based, and adaptive strategies
-- Performance comparisons
-
-```bash
-python examples/advanced_strategies_demo.py
-```
-
-### 4. `config_usage.py`
-**YAML configuration workflows**
-- Configuration file management
-- Batch processing setups
-- Reproducible experiments
-
-```bash
-python examples/config_usage.py
-```
-
-### 5. `rectification_example.py`
+### 2. `rectification_example.py`
 **Ground truth rectification system**
-- GT error detection with both conservative and aggressive modes
+- GT error detection with conservative and aggressive modes
 - Dataset organization for human review
 - Mode comparison and analysis
 
@@ -54,97 +28,126 @@ python examples/config_usage.py
 python examples/rectification_example.py
 ```
 
-### 6. `gt_rectify_config_example.py`
+### 3. `gt_rectify_config_example.py`
 **GT rectification configuration guide**
-- Demonstrates usage of YAML configuration files
-- Shows different rectification modes and their use cases
+- YAML configuration file usage
+- Different rectification modes and their use cases
 - Configuration override examples
 
 ```bash
 python examples/gt_rectify_config_example.py
 ```
 
-## 📁 Prerequisites
+## Prerequisites
 
-Before running examples, ensure you have:
+1. **DetectionFusion installed**:
+   ```bash
+   pip install -e ".[full]"
+   ```
 
-1. **Sample data structure**:
+2. **Sample data structure** (for merge/validate commands):
    ```
    labels/
    ├── model1/
-   │   └── detections.txt
+   │   └── image1.txt
    ├── model2/
-   │   └── detections.txt
-   └── model3/
-       └── detections.txt
+   │   └── image1.txt
+   └── GT/
+       └── image1.txt
    ```
 
-2. **DetectionFusion installed**:
-   ```bash
-   pip install -r requirements.txt
-   pip install -e .
-   ```
+## Quick Start
 
-## 🎯 Example Usage Patterns
+```python
+from detection_fusion import merge_detections, Detection, StrategyRegistry
 
-### Quick Start
-```bash
-# Run basic example
-python examples/basic_usage.py
+# List all 16 ensemble strategies
+print(StrategyRegistry.list_all())
 
-# Try advanced strategies
-python examples/advanced_strategies_demo.py
+# Merge detections from multiple models
+results = merge_detections("labels/", strategy="weighted_vote", iou_threshold=0.5)
+
+# Work with Detection objects (keyword args required)
+det = Detection(
+    class_id=0,
+    x=0.5, y=0.5,
+    w=0.2, h=0.3,
+    confidence=0.95,
+    model_source="yolov8"
+)
+
+# Detection is immutable - use with_* methods for copies
+det_copy = det.with_confidence(0.99)
 ```
 
-### GT Rectification
-```bash
-# Conservative error detection
-python examples/rectification_example.py
+## CLI Quick Reference
 
-# Or use CLI directly
-python gt_rectify.py --labels-dir labels --gt-dir gt --images-dir images --output-dir rectified
+```bash
+# List available strategies
+detection-fusion list-strategies
+detection-fusion list-strategies --category voting -v
+
+# List supported formats
+detection-fusion list-formats
+
+# Merge detections
+detection-fusion merge --input labels/ --strategy weighted_vote --output unified/
+
+# Validate against ground truth
+detection-fusion validate --input labels/ --gt GT/ --strategy weighted_vote
+
+# Convert formats
+detection-fusion convert --input annotations.xml --output labels/ \
+    --input-format voc_xml --output-format yolo
+
+# Rectify ground truth
+detection-fusion rectify --config configs/gt_rectification/balanced.yaml
 ```
 
-### Configuration-Based Workflows
-```bash
-# Use predefined configs
-python examples/config_usage.py
+## v1.0 API Patterns
 
-# Or with CLI tools
-python merge.py --config configs/high_precision_config.yaml
+### Detection Class
+```python
+# v1.0: Keyword arguments required, immutable (frozen Pydantic model)
+det = Detection(class_id=0, x=0.5, y=0.5, w=0.2, h=0.3, confidence=0.9, model_source="model1")
+
+# Create modified copies with with_* methods
+det2 = det.with_confidence(0.95)
+det3 = det.with_source("model2")
 ```
 
-## 📊 Expected Outputs
+### Strategy Registry
+```python
+from detection_fusion.strategies import create_strategy, StrategyRegistry
 
-Each example generates different outputs:
+# Create strategy with parameters
+strategy = create_strategy("weighted_vote", iou_threshold=0.5)
 
-- **basic_usage.py**: Console output with detection counts
-- **advanced_usage.py**: Plots and analysis files
-- **advanced_strategies_demo.py**: Comprehensive strategy comparison
-- **config_usage.py**: Configuration templates and results
-- **rectification_example.py**: GT error analysis and organized datasets
+# Merge detections
+merged = strategy.merge({"model1": dets1, "model2": dets2})
 
-## 🔧 Customization
+# List all strategies
+StrategyRegistry.list_all()
+```
 
-All examples can be customized by:
+### Pipeline API
+```python
+from detection_fusion import DetectionPipeline
 
-1. **Modifying data paths** in the example files
-2. **Adjusting parameters** (IoU thresholds, confidence levels)
-3. **Adding your own strategies** or analysis steps
-4. **Extending visualization** options
+result = (
+    DetectionPipeline()
+    .load("labels/", format="yolo")
+    .ensemble("weighted_vote", iou_threshold=0.5)
+    .evaluate("labels/GT/")
+    .run()
+)
 
-## 📚 Additional Resources
+print(f"mAP: {result.evaluation_result.map_50:.3f}")
+```
+
+## Additional Resources
 
 - [API Documentation](../docs/API.md)
 - [Strategy Guide](../docs/STRATEGY_GUIDE.md)
 - [Configuration Examples](../configs/)
 - [Troubleshooting Guide](../docs/TROUBLESHOOTING.md)
-
-## 💡 Tips
-
-- Start with `basic_usage.py` to understand core concepts
-- Use `rectification_example.py` for GT quality assessment
-- Refer to `advanced_strategies_demo.py` for complete strategy overview
-- Check `config_usage.py` for production workflows
-
-Happy experimenting! 🎉

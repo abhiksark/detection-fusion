@@ -1,0 +1,104 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "detection-fusion"
+dynamic = ["version"]
+description = "Object detection ensemble toolkit with ground truth validation"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.8"
+authors = [
+    {name = "Abhik Sarkar", email = "abhiksark@gmail.com"}
+]
+maintainers = [
+    {name = "Abhik Sarkar", email = "abhiksark@gmail.com"}
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Image Recognition",
+]
+keywords = ["object-detection", "ensemble", "computer-vision", "machine-learning", "yolo"]
+
+dependencies = [
+    "numpy>=1.19.0",
+    "pandas>=1.1.0",
+    "scikit-learn>=0.23.0",
+    "PyYAML>=5.4.0",
+    "tqdm>=4.60.0",
+    "pydantic>=2.0.0",
+    "click>=8.0.0",
+]
+
+[project.optional-dependencies]
+torch = ["torch>=1.7.0", "torchvision>=0.8.0"]
+viz = ["matplotlib>=3.3.0", "seaborn>=0.11.0"]
+cli = ["rich>=12.0.0"]
+full = ["detection-fusion[torch,viz,cli]"]
+dev = [
+    "detection-fusion[full]",
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "ruff>=0.1.0",
+    "mypy>=1.0",
+    "pre-commit>=3.0.0",
+]
+
+[project.scripts]
+detection-fusion = "detection_fusion.cli.main:cli"
+dfusion = "detection_fusion.cli.main:cli"
+
+[project.urls]
+Homepage = "https://github.com/abhiksark/detection-fusion"
+Documentation = "https://github.com/abhiksark/detection-fusion#readme"
+Repository = "https://github.com/abhiksark/detection-fusion"
+Issues = "https://github.com/abhiksark/detection-fusion/issues"
+
+[tool.setuptools.dynamic]
+version = {attr = "detection_fusion._version.__version__"}
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["detection_fusion*"]
+
+[tool.setuptools.package-data]
+detection_fusion = ["py.typed"]
+
+[tool.black]
+line-length = 100
+target-version = ["py38", "py39", "py310", "py311", "py312"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py38"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+ignore = ["E501", "W293"]  # Line too long, whitespace in blank lines (docstrings)
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["E402", "F401"]  # Allow imports not at top and "unused" re-exports
+"_compat.py" = ["F401"]  # Imports used for availability checking
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_ignores = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]

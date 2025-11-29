@@ -1,0 +1,26 @@
+# DetectionFusion GT Rectification - Custom Template
+# Copy and modify this file for your specific requirements
+
+# Rectification mode:
+#   "minimize_error" - Conservative, high-precision error detection
+#   "maximize_error" - Aggressive, comprehensive error detection
+mode: "minimize_error"
+
+# Path configuration
+paths:
+  labels_dir: "labels"           # Directory containing model prediction subdirectories
+  gt_dir: "GT"                   # Directory containing ground truth labels
+  images_dir: "images"           # Directory containing source images
+  output_dir: "rectified_dataset"  # Output directory for rectified dataset
+
+# Threshold configuration
+thresholds:
+  iou: 0.5                       # IoU threshold for matching predictions to GT (0.0-1.0)
+  confidence: 0.5                # Minimum confidence threshold (0.0-1.0)
+  min_agreement: 3               # Minimum number of models that must agree (>=1)
+
+# Output configuration
+output:
+  most_correct: 50               # Number of most correct images to include (>=0)
+  most_incorrect: 50             # Number of most incorrect images to include (>=0)
+  copy_images: true              # Whether to copy source images to output directory
