@@ -72,7 +72,7 @@ class Evaluator:
             reader = FormatRegistry.get_reader("yolo")
             detections = reader.read_file(gt_path)
             # Set model_source to GT for all detections
-            self._gt_cache[gt_file] = [d.with_model_source("GT") for d in detections]
+            self._gt_cache[gt_file] = [d.with_source("GT") for d in detections]
 
         return self._gt_cache[gt_file]
 
@@ -92,7 +92,7 @@ class Evaluator:
             image_name = os.path.splitext(os.path.basename(gt_file))[0]
             detections = reader.read_file(gt_file)
             # Set model_source to GT for all detections
-            detections = [d.with_model_source("GT") for d in detections]
+            detections = [d.with_source("GT") for d in detections]
 
             # Store per-image GT
             self.ground_truth[image_name] = detections

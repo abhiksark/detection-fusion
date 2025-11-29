@@ -30,7 +30,7 @@ def _read_detections(
     for d in detections:
         # Apply model_source and image_name if provided
         if model_name or image_name:
-            d = d.with_model_source(model_name) if model_name else d
+            d = d.with_source(model_name) if model_name else d
             if image_name:
                 d = Detection(
                     class_id=d.class_id,
