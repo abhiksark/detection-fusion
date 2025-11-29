@@ -329,6 +329,16 @@ mypy detection_fusion
 }
 ```
 
+## Contributing
+
+Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+## Documentation
+
+- [Strategy Guide](docs/STRATEGY_GUIDE.md) - Detailed guide to all ensemble strategies
+- [API Reference](https://github.com/abhiksark/detection-fusion#python-api) - Python API documentation
+- [Examples](examples/) - Example scripts and usage patterns
+
 ## License
 
 MIT License - see [LICENSE](LICENSE) for details.
@@ -336,7 +346,3 @@ MIT License - see [LICENSE](LICENSE) for details.
 ## Author
 
 **Abhik Sarkar** - [GitHub](https://github.com/abhiksark)
-
----
-
-**Happy Detection Fusion!**
