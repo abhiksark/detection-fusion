@@ -1,3 +1,4 @@
+import threading
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Type
 
@@ -11,12 +12,14 @@ class FormatRegistry:
 
     _readers: Dict[str, Type[AnnotationReader]] = {}
     _writers: Dict[str, Type[AnnotationWriter]] = {}
+    _lock = threading.Lock()
 
     @classmethod
     def register_reader(cls, name: Optional[str] = None) -> Callable:
         def decorator(reader_class: Type[AnnotationReader]) -> Type[AnnotationReader]:
             reg_name = name or reader_class.format_name
-            cls._readers[reg_name] = reader_class
+            with cls._lock:
+                cls._readers[reg_name] = reader_class
             return reader_class
 
         return decorator
@@ -25,7 +28,8 @@ class FormatRegistry:
     def register_writer(cls, name: Optional[str] = None) -> Callable:
         def decorator(writer_class: Type[AnnotationWriter]) -> Type[AnnotationWriter]:
             reg_name = name or writer_class.format_name
-            cls._writers[reg_name] = writer_class
+            with cls._lock:
+                cls._writers[reg_name] = writer_class
             return writer_class
 
         return decorator
