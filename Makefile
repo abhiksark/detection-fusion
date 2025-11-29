@@ -1,4 +1,4 @@
-.PHONY: format lint check test clean install dev-install help
+.PHONY: format lint check test clean install dev-install help hooks pre-commit
 
 # Default target
 help:
@@ -17,6 +17,10 @@ help:
 	@echo "Installation:"
 	@echo "  make install    - Install package"
 	@echo "  make dev        - Install package with dev dependencies"
+	@echo "  make hooks      - Install pre-commit hooks"
+	@echo ""
+	@echo "Pre-commit:"
+	@echo "  make pre-commit - Run pre-commit on all files"
 	@echo ""
 	@echo "Cleanup:"
 	@echo "  make clean      - Remove build artifacts"
@@ -53,6 +57,14 @@ install:
 # Install with dev dependencies
 dev:
 	pip install -e ".[dev]"
+
+# Install pre-commit hooks
+hooks:
+	pre-commit install
+
+# Run pre-commit on all files
+pre-commit:
+	pre-commit run --all-files
 
 # Clean build artifacts
 clean:

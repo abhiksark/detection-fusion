@@ -35,15 +35,16 @@ Perfect for scenarios where you have multiple object detection models - leverage
 
 DetectionFusion combines predictions from multiple object detection models into a single, more accurate result.
 
-<p align="center">
-  <img src="assets/fusion-before.png" alt="Before Fusion" width="400">
-  <img src="assets/fusion-after.png" alt="After Fusion" width="400">
-</p>
-
-<p align="center">
-  <em>Left: Multiple models (YOLOv8n, RetinaNet, DETR) produce different bounding boxes.<br>
-  Right: DetectionFusion merges them into a unified result.</em>
-</p>
+<table align="center">
+  <tr>
+    <td align="center"><img src="assets/fusion-before.png" alt="Before Fusion" height="280"></td>
+    <td align="center"><img src="assets/fusion-after.png" alt="After Fusion" height="280"></td>
+  </tr>
+  <tr>
+    <td align="center"><em>Multiple models produce different boxes</em></td>
+    <td align="center"><em>DetectionFusion merges into one result</em></td>
+  </tr>
+</table>
 
 ## Installation
 
@@ -329,13 +330,12 @@ pytest tests/strategies/test_registry.py -v
 # Install dev dependencies
 pip install -e ".[dev]"
 
+# Set up pre-commit hooks
+make hooks
+
 # Format and lint
 make format
 make lint
-
-# Or manually
-ruff format detection_fusion tests examples
-ruff check detection_fusion tests examples
 
 # Type checking
 mypy detection_fusion
