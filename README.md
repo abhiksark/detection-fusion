@@ -1,8 +1,18 @@
-# DetectionFusion - Object Detection Ensemble Toolkit
+# DetectionFusion
 
-[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/version-1.0.0-green.svg)](https://github.com/abhiksark/detection-fusion)
+<p align="center">
+  <img src="assets/logo.png" alt="DetectionFusion Logo" width="400">
+</p>
+
+<p align="center">
+  <strong>An Object Detection Ensemble Toolkit</strong>
+</p>
+
+<p align="center">
+  <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.8+-blue.svg" alt="Python 3.8+"></a>
+  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
+  <a href="https://github.com/abhiksark/detection-fusion"><img src="https://img.shields.io/badge/version-1.0.0-green.svg" alt="Version"></a>
+</p>
 
 **DetectionFusion** is a Python toolkit for fusing multiple object detection results with ground truth validation and error analysis.
 
@@ -20,6 +30,20 @@ Perfect for scenarios where you have multiple object detection models - leverage
 - **GT Rectification**: Identify potential annotation errors using ensemble consensus
 - **Pydantic Models**: Type-safe configuration and detection classes
 - **PyPI Ready**: Modern `pyproject.toml` packaging
+
+## How It Works
+
+DetectionFusion combines predictions from multiple object detection models into a single, more accurate result.
+
+<p align="center">
+  <img src="assets/fusion-before.png" alt="Before Fusion" width="400">
+  <img src="assets/fusion-after.png" alt="After Fusion" width="400">
+</p>
+
+<p align="center">
+  <em>Left: Multiple models (YOLOv8n, RetinaNet, DETR) produce different bounding boxes.<br>
+  Right: DetectionFusion merges them into a unified result.</em>
+</p>
 
 ## Installation
 
